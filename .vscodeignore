@@ -1,0 +1,47 @@
+# Source files (only compiled out/ in package)
+src/
+tests/
+
+# Configuration files
+tsconfig.json
+*.config.js
+eslintrc.*
+eslint.config.*
+
+# Documentation
+specs/
+README.md
+CHANGELOG.md
+
+# Development
+.vscode/
+.git/
+.gitignore
+.github/
+
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Testing
+coverage/
+.nyc_output/
+
+# Build outputs other than out/
+dist/
+build/
+
+# Temporary and cache files
+*.log
+*.tmp
+.cache/
+
+# Specification files
+.claude/
+.specify/
+
+# OS files
+.DS_Store
+Thumbs.db

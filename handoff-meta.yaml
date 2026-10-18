@@ -1,0 +1,19 @@
+id: handoff-uuid
+createdAt: ISO-8601
+sourceSessionId: local-session-id
+sourceProfileId: source-profile-id
+destinationProfileId: destination-profile-id
+
+mode: full # full | summary | none
+policyDecision: allowed-with-confirmation
+
+contentManifest:
+  transcript: true
+  code: false
+  toolOutput: false
+  paths: true
+  diffs: false
+  attachments: false
+  sensitiveRedactionApplied: true
+
+retentionUntil: ISO-8601-or-null

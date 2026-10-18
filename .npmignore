@@ -1,0 +1,35 @@
+# Source files (only compiled dist/ should be published if applicable)
+src/
+tests/
+
+# Documentation (keep README.md and CHANGELOG.md)
+specs/
+
+# Development
+*.log
+.env*
+.vscode/
+
+# Build artifacts (keep needed ones, exclude build scripts)
+*.vsix
+
+# Testing
+coverage/
+.nyc_output/
+
+# Git
+.git/
+.gitignore
+.github/
+
+# Specification
+.claude/
+.specify/
+
+# Temporary files
+*.tmp
+.cache/
+
+# OS files
+.DS_Store
+Thumbs.db

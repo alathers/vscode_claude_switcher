@@ -1,0 +1,44 @@
+schemaVersion: 1
+id: laptop-ollama-qwen
+label: Laptop Ollama - Qwen Coder
+
+adapter: ollama
+model: qwen-coder
+baseUrl: http://127.0.0.1:11434
+trustZone: local
+
+credential:
+  mode: none # none | secretRef | environment | subscription
+  secretRef: null
+
+tunnel:
+  enabled: false
+  sshHostAlias: null
+  localPort: null
+
+limits:
+  contextTokens: null
+  maxOutputTokens: null
+
+permissions:
+  mode: edit-and-command # review-only | edit-only | edit-and-command
+  workspacePaths: []
+
+network:
+  providerClass: local
+  supportingNetwork: allowed
+
+instructions: null
+environmentRefs: []
+
+healthCheck:
+  url: /api/tags
+  method: GET
+
+capabilities:
+  declared:
+    streaming: true
+    tools: true
+    fileEdits: true
+    commands: true
+    transcriptObservable: false
