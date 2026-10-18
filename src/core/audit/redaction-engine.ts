@@ -71,7 +71,7 @@ export const BUILTIN_RULES: RedactionRule[] = [
     description: 'Redact Anthropic API keys (sk-ant-...)',
     pattern: /sk-ant-[a-zA-Z0-9_-]{20,}/g,
     replacement: '[REDACTED: API_KEY]',
-    priority: 100,
+    priority: 110,
     enabled: true,
   },
   {
@@ -79,6 +79,22 @@ export const BUILTIN_RULES: RedactionRule[] = [
     description: 'Redact OpenAI API keys (sk-...)',
     pattern: /sk-[a-zA-Z0-9]{20,}/g,
     replacement: '[REDACTED: API_KEY]',
+    priority: 110,
+    enabled: true,
+  },
+  {
+    id: 'jwt-token',
+    description: 'Redact JWT tokens',
+    pattern: /Bearer\s+eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+/gi,
+    replacement: 'Bearer [REDACTED: JWT]',
+    priority: 100,
+    enabled: true,
+  },
+  {
+    id: 'ssh-key',
+    description: 'Redact SSH private keys',
+    pattern: /-----BEGIN [A-Z ]+ PRIVATE KEY-----[\s\S]*?-----END [A-Z ]+ PRIVATE KEY-----/g,
+    replacement: '-----REDACTED SSH PRIVATE KEY-----',
     priority: 100,
     enabled: true,
   },
@@ -107,22 +123,6 @@ export const BUILTIN_RULES: RedactionRule[] = [
     enabled: true,
   },
   {
-    id: 'ssh-key',
-    description: 'Redact SSH private keys',
-    pattern: /-----BEGIN [A-Z ]+ PRIVATE KEY-----[\s\S]*?-----END [A-Z ]+ PRIVATE KEY-----/g,
-    replacement: '-----REDACTED SSH PRIVATE KEY-----',
-    priority: 100,
-    enabled: true,
-  },
-  {
-    id: 'jwt-token',
-    description: 'Redact JWT tokens',
-    pattern: /Bearer\s+eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+/gi,
-    replacement: 'Bearer [REDACTED: JWT]',
-    priority: 90,
-    enabled: true,
-  },
-  {
     id: 'email-address',
     description: 'Redact email addresses',
     pattern: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g,
@@ -141,7 +141,7 @@ export const BUILTIN_RULES: RedactionRule[] = [
   {
     id: 'personal-name',
     description: 'Redact PII patterns (names in context)',
-    pattern: /\b(my name is|i am|my email is|my password is)\s+[^\s,.\n]+/gi,
+    pattern: /\b(my name is|i am|i'm|my email is|my password is)\s+[^\s,.\n]+/gi,
     replacement: '$1 [REDACTED: PII]',
     priority: 60,
     enabled: true,
@@ -230,14 +230,11 @@ export class RedactionEngine {
     enabledRules.forEach(rule => {
       const pattern = typeof rule.pattern === 'string' ? new RegExp(rule.pattern, 'g') : rule.pattern;
 
-      const countBefore = redacted.length;
-      redacted = redacted.replace(pattern, rule.replacement);
-      const countAfter = redacted.length;
-
-      const matches = countBefore - countAfter;
+      const matches = this.countMatches(redacted, pattern);
       if (matches > 0) {
+        redacted = redacted.replace(pattern, rule.replacement);
         matchedPatterns.add(rule.id);
-        redactionCount += this.countMatches(content, pattern);
+        redactionCount += matches;
       }
     });
 
