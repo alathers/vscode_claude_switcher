@@ -145,7 +145,7 @@ export class SecretRefValidator {
     requiredSecrets.forEach(secret => {
       secretRefs[secret.key] = {
         key: secret.key,
-        value: secrets[secret.key] || null,
+        value: secrets[secret.key] ?? null,
         redacted: true, // Always redact from logs
       };
     });
@@ -278,7 +278,7 @@ export class SecretRedactor {
     let redacted = message;
 
     this.secretPatterns.forEach((pattern, secret) => {
-      const marker = this.secretMarkers.get(secret) || REDACTION_MARKERS.SECRET;
+      const marker = this.secretMarkers.get(secret) ?? REDACTION_MARKERS.SECRET;
       redacted = redacted.replace(pattern, marker);
     });
 

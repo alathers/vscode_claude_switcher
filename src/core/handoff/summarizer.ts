@@ -266,7 +266,7 @@ export class Summarizer {
     transcript: Transcript,
     options: SummarizerOptions = {},
   ): ConversationSummary {
-    const format = options.format || 'outline';
+    const format = options.format ?? 'outline';
 
     if (format === 'narrative' && !this.canGenerateNarrative()) {
       // Fall back to outline if narrative not available
@@ -304,7 +304,7 @@ export class Summarizer {
       profileId: transcript.profileId,
       format,
       startTime: transcript.startTime,
-      endTime: transcript.endTime || new Date(),
+      endTime: transcript.endTime ?? new Date(),
       turnCount,
       content,
       fileOperations,

@@ -259,7 +259,7 @@ export class RedactionEngine {
       const parsed = JSON.parse(jsonString);
       const redacted = this.redactObject(parsed);
       return JSON.stringify(redacted, null, 2);
-    } catch (err) {
+    } catch {
       // If not valid JSON, fall back to text redaction
       return jsonString;
     }

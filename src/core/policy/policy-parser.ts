@@ -367,7 +367,7 @@ export class PolicyParser {
     _warnings: ValidationWarning[],
   ): void {
     // Validate workspace section
-    if (!policy.workspace || !policy.workspace.id) {
+    if (!policy?.workspace?.id) {
       errors.push({
         field: 'workspace.id',
         message: 'Workspace ID is required',
@@ -382,7 +382,7 @@ export class PolicyParser {
     }
 
     // Validate privacy mode
-    if (!policy.privacy || !policy.privacy.mode) {
+    if (!policy?.privacy?.mode) {
       errors.push({
         field: 'privacy.mode',
         message: 'Privacy mode is required',

@@ -231,7 +231,7 @@ export class HandoffSerializer {
 
     // Security level based on cross-provider and privacy mode
     const securityLevel = this.determineSecurityLevel(
-      params.security?.privacyMode || 'unrestricted',
+      params.security?.privacyMode ?? 'unrestricted',
       crossProvider,
     );
 
@@ -249,7 +249,7 @@ export class HandoffSerializer {
         userNotes: params.metadata.userNotes,
       },
       security: {
-        privacyMode: params.security?.privacyMode || 'unrestricted',
+        privacyMode: params.security?.privacyMode ?? 'unrestricted',
         crossProvider,
         secretsRedacted: true, // Always redact for safety
         piiRedacted: params.security?.piiRedacted ?? true,
@@ -331,15 +331,15 @@ export class HandoffSerializer {
       return false;
     }
 
-    if (!packet.source || !packet.source.profileId || !packet.source.adapterType) {
+    if (!packet?.source?.profileId || !packet?.source?.adapterType) {
       return false;
     }
 
-    if (!packet.metadata || !packet.metadata.createdAt) {
+    if (!packet?.metadata?.createdAt) {
       return false;
     }
 
-    if (!packet.security || !packet.security.privacyMode) {
+    if (!packet?.security?.privacyMode) {
       return false;
     }
 

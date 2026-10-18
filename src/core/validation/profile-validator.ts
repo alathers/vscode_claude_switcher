@@ -374,7 +374,7 @@ export class ProfileValidator {
     violations: PolicyViolation[],
   ): void {
     // Check if provider class is blocked
-    const blockedProviders = policy.blockedProviderClasses || [];
+    const blockedProviders = policy.blockedProviderClasses ?? [];
     if (blockedProviders.includes(config.network.providerClass)) {
       violations.push({
         rule: 'network.blocked-provider',
@@ -384,7 +384,7 @@ export class ProfileValidator {
     }
 
     // Check specific adapter restrictions
-    const blockedAdapters = policy.blockedAdapters || [];
+    const blockedAdapters = policy.blockedAdapters ?? [];
     if (blockedAdapters.includes(config.adapter)) {
       violations.push({
         rule: 'network.blocked-adapter',
@@ -409,7 +409,7 @@ export class ProfileValidator {
       'edit-and-command': 3,
     };
 
-    const maxPermission = policy.maxPermissionMode || 'edit-and-command';
+    const maxPermission = policy.maxPermissionMode ?? 'edit-and-command';
     const configPermission = config.permissions.mode;
 
     if (
