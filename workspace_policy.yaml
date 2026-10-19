@@ -1,0 +1,33 @@
+schemaVersion: 1
+
+privacy:
+  mode: guarded # unrestricted | guarded | strict
+
+  cloudModelRequests:
+    default: require-confirmation
+
+  handoff:
+    allowedModes: [full, summary, none]
+    defaultMode: summary
+    summaryDefault:
+      includeCode: false
+      includeSensitiveData: false
+      includeToolOutput: false
+      includeDiffs: false
+      includeCommandOutput: false
+      includePaths: true
+
+  policyChanges:
+    requireConfirmation: true
+    requireReason: false
+    revertAfterMinutes: null
+    requireSecondApprover: false
+
+concurrency:
+  default: concurrent
+  conflictAction: warn
+  supportsWorktrees: true
+  checkpointBeforeMutation: false
+
+profiles:
+  allowedTemplateIds: []

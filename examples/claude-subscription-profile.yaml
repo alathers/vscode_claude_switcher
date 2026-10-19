@@ -1,0 +1,43 @@
+schemaVersion: 1
+id: claude-subscription
+label: Claude Standard Subscription
+
+adapter: native-claude
+model: claude-3-5-sonnet-20241022
+trustZone: cloud
+
+credential:
+  mode: subscription
+  secretRef: null
+
+tunnel:
+  enabled: false
+  sshHostAlias: null
+  localPort: null
+
+limits:
+  contextTokens: null
+  maxOutputTokens: null
+
+permissions:
+  mode: edit-and-command
+  workspacePaths: []
+
+network:
+  providerClass: cloud
+  supportingNetwork: allowed
+
+instructions: null
+environmentRefs: []
+
+healthCheck:
+  url: null
+  method: null
+
+capabilities:
+  declared:
+    streaming: true
+    tools: true
+    fileEdits: true
+    commands: false
+    transcriptObservable: true
