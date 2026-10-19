@@ -165,6 +165,86 @@ describe('SecretRefValidator', () => {
       expect(result.secrets['MODEL_NAME'].value).toBe('gpt-4-turbo');
     });
 
+    it('should validate profile with multi-key credential mode', () => {
+      const validator = new SecretRefValidator();
+      const config: ProfileConfig = {
+        id: 'test-profile',
+        adapter: 'anthropic-compatible',
+        model: 'claude-3-5-sonnet-20241022',
+        credential: {
+          mode: 'multi-key',
+          secretRefs: ['claude-key-1', 'claude-key-2', 'claude-key-3'],
+        },
+        keyRotationStrategy: 'round-robin',
+        permissions: { mode: 'edit-only' },
+        network: {
+          providerClass: 'cloud',
+          supportingNetwork: 'allowed',
+        },
+        capabilities: {
+          streaming: false,
+          tools: false,
+          fileEdits: false,
+          commands: false,
+          modelDiscovery: false,
+          transcriptObservable: false,
+        },
+      } as ProfileConfig;
+
+      const secrets = {
+        'claude-key-1': 'sk-ant-key1',
+        'claude-key-2': 'sk-ant-key2',
+        'claude-key-3': 'sk-ant-key3',
+      };
+
+      const result = validator.validateSecretRefs(config, secrets);
+
+      expect(result.complete).toBe(true);
+      expect(result.errors).toEqual([]);
+      expect(result.secrets['claude-key-1'].value).toBe('sk-ant-key1');
+      expect(result.secrets['claude-key-2'].value).toBe('sk-ant-key2');
+      expect(result.secrets['claude-key-3'].value).toBe('sk-ant-key3');
+    });
+
+    it('should reject multi-key profile when any secret is missing', () => {
+      const validator = new SecretRefValidator();
+      const config: ProfileConfig = {
+        id: 'test-profile',
+        adapter: 'anthropic-compatible',
+        model: 'claude-3-5-sonnet-20241022',
+        credential: {
+          mode: 'multi-key',
+          secretRefs: ['claude-key-1', 'claude-key-2', 'claude-key-3'],
+        },
+        keyRotationStrategy: 'round-robin',
+        permissions: { mode: 'edit-only' },
+        network: {
+          providerClass: 'cloud',
+          supportingNetwork: 'allowed',
+        },
+        capabilities: {
+          streaming: false,
+          tools: false,
+          fileEdits: false,
+          commands: false,
+          modelDiscovery: false,
+          transcriptObservable: false,
+        },
+      } as ProfileConfig;
+
+      const secrets = {
+        'claude-key-1': 'sk-ant-key1',
+        // claude-key-2 and claude-key-3 are missing
+      };
+
+      const result = validator.validateSecretRefs(config, secrets);
+
+      expect(result.complete).toBe(false);
+      expect(result.errors.length).toBe(2);
+      expect(result.errors.some(e => e.message.includes('claude-key-2'))).toBe(true);
+      expect(result.errors.some(e => e.message.includes('claude-key-3'))).toBe(true);
+    });
+
     it('should warn about unused secrets', () => {
       const validator = new SecretRefValidator();
       const config: ProfileConfig = {

@@ -8,7 +8,10 @@ baseUrl: http://127.0.0.1:11434
 trustZone: local
 
 credential:
-  mode: none # none | secretRef | environment | subscription
+  mode: none # none | secretRef | environment | subscription | multi-key
+  # secretRef for single API key: secretRef: 'my-api-key'
+  # secretRefs for multiple API keys (load balancing): secretRefs: ['key-1', 'key-2']
+ subscriptionMode: null # 'subscription' for built-in Claude Code authentication
   secretRef: null
 
 tunnel:

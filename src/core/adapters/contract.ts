@@ -100,8 +100,12 @@ export interface ProfileConfig {
 
   /** Credential configuration */
   credential: {
-    mode: 'none' | 'secretRef' | 'environment' | 'subscription';
+    mode: 'none' | 'secretRef' | 'environment' | 'subscription' | 'multi-key';
     secretRef?: string | null;
+    /** Multiple secret references (for multi-key authentication, e.g., Max accounts) */
+    secretRefs?: string[] | null;
+    /** Key rotation strategy (round-robin, weighted-random, sequential) */
+    keyRotationStrategy?: 'round-robin' | 'weighted-random' | 'sequential' | null;
   };
 
  /** SSH tunnel configuration (optional) */

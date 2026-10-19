@@ -1,0 +1,44 @@
+schemaVersion: 1
+id: claude-max-api
+label: Claude Max API Account
+
+adapter: anthropic-compatible
+model: claude-3-5-sonnet-20241022
+baseUrl: https://api.anthropic.com
+trustZone: cloud
+
+credential:
+  mode: secretRef
+  secretRef: claude-max-api-key
+
+tunnel:
+  enabled: false
+  sshHostAlias: null
+  localPort: null
+
+limits:
+  contextTokens: null
+  maxOutputTokens: null
+
+permissions:
+  mode: edit-and-command
+  workspacePaths: []
+
+network:
+  providerClass: cloud
+  supportingNetwork: allowed
+
+instructions: null
+environmentRefs: []
+
+healthCheck:
+  url: https://api.anthropic.com/v1/models
+  method: GET
+
+capabilities:
+  declared:
+    streaming: true
+    tools: true
+    fileEdits: true
+    commands: false
+    transcriptObservable: false

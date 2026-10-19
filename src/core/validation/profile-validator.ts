@@ -141,13 +141,13 @@ export class ProfileValidator {
     const warnings: ValidationWarning[] = [];
 
     // 1. Basic configuration validation
-    this.validateConfigFields(config, errors);
+    this.validateConfigFields(config, errors, warnings);
 
     // 2. Network classification validation
-    this.validateNetworkClassification(config, errors);
+    this.validateNetworkClassification(config, errors, warnings);
 
     // 3. Permission mode validation
-    this.validatePermissions(config, errors);
+    this.validatePermissions(config, errors, warnings);
 
     // 4. Capability validation (if adapter instance provided)
     // Note: Adapter not available at this layer - done during activation
@@ -207,7 +207,8 @@ export class ProfileValidator {
   private validateConfigFields(
     config: ProfileConfig,
     errors: ValidationError[],
-): void {
+    warnings: ValidationWarning[],
+  ): void {
     // Validate adapter type
     const validAdapters: Array<ProfileConfig['adapter']> = [
       'native-claude',
@@ -238,6 +239,7 @@ export class ProfileValidator {
       'secretRef',
       'environment',
       'subscription',
+      'multi-key',
     ];
 
     if (!validModes.includes(config.credential.mode)) {
@@ -252,6 +254,24 @@ export class ProfileValidator {
         field: 'credential.secretRef',
         message: 'secretRef is required when credential.mode is "secretRef"',
       });
+    }
+
+    if (config.credential.mode === 'multi-key') {
+      if (!config.credential.secretRefs || config.credential.secretRefs.length === 0) {
+        errors.push({
+          field: 'credential.secretRefs',
+          message: 'secretRefs array with at least one entry is required when credential.mode is "multi-key"',
+        });
+      }
+      if (config.credential.secretRef) {
+        const typedConfig = config as ProfileConfig & { credential: { secretRef?: string } };
+        if (typedConfig.credential.secretRef) {
+          warnings.push({
+            field: 'credential',
+            message: 'Both secretRef and secretRefs are present. Using secretRefs array for multi-key mode.',
+          });
+        }
+      }
     }
 
     // Validate permission mode
@@ -275,7 +295,9 @@ export class ProfileValidator {
   private validateNetworkClassification(
     config: ProfileConfig,
     errors: ValidationError[],
+    _warnings: ValidationWarning[],
   ): void {
+
     const validProviderClasses: Array<ProfileConfig['network']['providerClass']> = [
       'local',
       'private-network',
@@ -308,7 +330,9 @@ export class ProfileValidator {
   private validatePermissions(
     config: ProfileConfig,
     errors: ValidationError[],
+    _warnings: ValidationWarning[],
   ): void {
+
     // Check workspace paths are provided paths array mode
     if (config.permissions.workspacePaths) {
       if (!Array.isArray(config.permissions.workspacePaths)) {

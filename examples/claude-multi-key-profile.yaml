@@ -1,0 +1,49 @@
+schemaVersion: 1
+id: claude-multi-max-accounts
+label: Claude Multi-Max (Load Balanced)
+
+adapter: anthropic-compatible
+model: claude-3-5-sonnet-20241022
+baseUrl: https://api.anthropic.com
+trustZone: cloud
+
+credential:
+  mode: multi-key
+  secretRef: null
+  secretRefs:
+    - claude-max-api-key-1
+    - claude-max-api-key-2
+    - claude-max-api-key-3
+  keyRotationStrategy: round-robin
+
+tunnel:
+  enabled: false
+  sshHostAlias: null
+  localPort: null
+
+limits:
+  contextTokens: null
+  maxOutputTokens: null
+
+permissions:
+  mode: edit-and-command
+  workspacePaths: []
+
+network:
+  providerClass: cloud
+  supportingNetwork: allowed
+
+instructions: null
+environmentRefs: []
+
+healthCheck:
+  url: https://api.anthropic.com/v1/models
+  method: GET
+
+capabilities:
+  declared:
+    streaming: true
+    tools: true
+    fileEdits: true
+    commands: false
+    transcriptObservable: false

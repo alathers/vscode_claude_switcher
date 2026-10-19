@@ -179,6 +179,17 @@ export class SecretRefValidator {
       });
     }
 
+    // Multi-key mode requires all secrets in the array to be present
+    if (credential.mode === 'multi-key' && credential.secretRefs) {
+      credential.secretRefs.forEach(secretKey => {
+        secrets.push({
+          key: secretKey,
+          value: null, // Not resolved yet
+          redacted: true,
+        });
+      });
+    }
+
     // Environment mode resolves vars at runtime, not SecretStorage
     // but we may need to validate environment refs exist
     if (credential.mode === 'environment' && config.environmentRefs) {
