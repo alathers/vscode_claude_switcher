@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p /Users/alathers/src/alathers/vscode_claude_switcher/specs/002-model-cost-optimization)",
+      "Bash(specify preset *)",
+      "Bash(sed -i '' '$d' /Users/alathers/src/alathers/vscode_claude_switcher/src/core/policy/policy-parser.ts)",
+      "Bash(.specify/scripts/bash/setup-tasks.sh --json)",
+      "Bash(awk '/^## Phase/,/^## Phase/ || /== Checkpoint/,/^## Phase/ {if \\(/^\\\\- \\\\[X\\\\]/\\) ++c[line]=1; if \\(/^\\\\- \\\\[ \\\\]/\\) ++u[line]=1; if \\(/^## Phase/ || /== Checkpoint/\\) print p, c[total]/\\(c[total]+u[total]\\)*100\"%\", \"completed\"; p=$0; c[total]=0; u[total]=0} END {print p, c[total]/\\(c[total]+u[total]\\)*100\"%\", \"completed\"}' /Users/alathers/src/alathers/vscode_claude_switcher/specs/002-model-cost-optimization/tasks.md)"
+    ],
+    "additionalDirectories": [
+      "/Users/alathers/src/alathers/vscode_claude_switcher/specs"
+    ]
+  }
+}

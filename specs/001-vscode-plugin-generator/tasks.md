@@ -56,15 +56,15 @@ description: "Task list for feature implementation"
 
 ### Core State Management (Pure Logic)
 
-- [ ] T013 Create profile-registry.ts in src/core/state/profile-registry.ts - Profile loading from YAML, merging defaults, validation logic (no VS Code API imports)
-- [ ] T014 [P] Create state-machine.ts in src/core/state/state-machine.ts - Activation state transitions, handoff state machine logic (no VS Code API imports)
-- [ ] T015 [P] Create activity-tracker.ts in src/core/state/activity-tracker.ts - Concurrent session tracking, conflict detection logic (no VS Code API imports)
+- [x] T013 Create profile-registry.ts in src/core/state/profile-registry.ts - Profile loading from YAML, merging defaults, validation logic (no VS Code API imports)
+- [x] T014 [P] Create state-machine.ts in src/core/state/state-machine.ts - Activation state transitions, handoff state machine logic (no VS Code API imports)
+- [x] T015 [P] Create activity-tracker.ts in src/core/state/activity-tracker.ts - Concurrent session tracking, conflict detection logic (no VS Code API imports)
 
 ### Policy Engine (Pure Logic)
 
-- [ ] T016 Create policy-engine.ts in src/core/policy/policy-engine.ts - Privacy mode enforcement, request classification (model-provider vs. supporting network), routing decisions (no VS Code API imports)
-- [ ] T017 [P] Create policy-parser.ts in src/core/policy/policy-parser.ts - Workspace policy YAML parsing, validation logic (no VS Code API imports)
-- [ ] T018 [P] Create guard-distributor.ts in src/core/policy/guard-distributor.ts - Approval flow, timeout tracking, multi-approver logic (no VS Code API imports)
+- [x] T016 Create policy-engine.ts in src/core/policy/policy-engine.ts - Privacy mode enforcement, request classification (model-provider vs. supporting network), routing decisions (no VS Code API imports)
+- [x] T017 [P] Create policy-parser.ts in src/core/policy/policy-parser.ts - Workspace policy YAML parsing, validation logic (no VS Code API imports)
+- [x] T018 [P] Create guard-distributor.ts in src/core/policy/guard-distributor.ts - Approval flow, timeout tracking, multi-approver logic (no VS Code API imports)
 
 ### Adapter Interface (Pure Logic)
 
@@ -104,12 +104,12 @@ description: "Task list for feature implementation"
 
 ### Unit Tests for Foundational Logic (Mandatory per Constitution)
 
-- [ ] T037 [P] Test profile-registry.ts in tests/unit/core/state/profile-registry.test.ts
-- [ ] T038 [P] Test state-machine.ts in tests/unit/core/state/state-machine.test.ts
-- [ ] T039 [P] Test activity-tracker.ts in tests/unit/core/state/activity-tracker.test.ts
-- [ ] T040 [P] Test policy-engine.ts in tests/unit/core/policy/policy-engine.test.ts
-- [ ] T041 [P] Test policy-parser.ts in tests/unit/core/policy/policy-parser.test.ts
-- [ ] T042 [P] Test guard-distributor.ts in tests/unit/core/policy/guard-distributor.test.ts
+- [x] T037 [P] Test profile-registry.ts in tests/unit/core/state/profile-registry.test.ts
+- [x] T038 [P] Test state-machine.ts in tests/unit/core/state/state-machine.test.ts
+- [x] T039 [P] Test activity-tracker.ts in tests/unit/core/state/activity-tracker.test.ts
+- [x] T040 [P] Test policy-engine.ts in tests/unit/core/policy/policy-engine.test.ts
+- [x] T041 [P] Test policy-parser.ts in tests/unit/core/policy/policy-parser.test.ts
+- [x] T042 [P] Test guard-distributor.ts in tests/unit/core/policy/guard-distributor.test.ts
 - [ ] T043 [P] Test adapter contract.ts in tests/unit/core/adapters/contract.test.ts
 - [ ] T044 [P] Test profile-validator.ts in tests/unit/core/validation/profile-validator.test.ts
 - [ ] T045 [P] Test capability-checker.ts in tests/unit/core/validation/capability-checker.test.ts
