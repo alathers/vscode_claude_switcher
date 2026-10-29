@@ -1,576 +1,512 @@
 /**
  * src/core/policy/policy-parser.ts
  *
- * Policy Parser Module
+ * Policy Parser
  *
- * Parses and validates workspace policy configuration from YAML.
- * Enforces privacy mode, network restrictions, and permission limits.
- *
- * This module contains NO VS Code API imports - pure TypeScript logic.
- * File I/O is isolated to the vscode layer.
+ * Workspace policy YAML parsing and validation logic.
+ * This file contains NO VS Code API imports - pure TypeScript logic.
  */
 
-import { ValidationError, ValidationWarning } from '../adapters/contract.js';
+import YAML from 'yaml';
+import { WorkspacePolicy, HandoffMode } from './policy-engine.js';
 
 // ============================================================
-// POLICY CONFIGURATION TYPES
+// TYPE DEFINITIONS
 // ============================================================
 
 /**
- * Complete workspace policy configuration.
- *
- * Defines privacy controls, network restrictions, and permission limits
- * for the workspace. Loaded from workspace_policy.yaml.
+ * Validation error.
  */
-export interface WorkspacePolicy {
-  /**
-   * Workspace identification.
-   */
-  workspace: {
-    /** Unique workspace identifier */
-    id: string;
-
-    /** Workspace name (optional) */
-    name?: string;
-  };
-
-  /**
-   * Privacy mode settings.
-   *
-   * Controls data flow restrictions across provider networks.
-   */
-  privacy: {
-    /**
-     * Current privacy mode.
-     *
-     * - unrestricted: No data flow restrictions
-     * - guarded: Warn about cloud providers, block supporting network if configured
-     * - strict: No cloud providers allowed, no supporting network
-     */
-    mode: 'unrestricted' | 'guarded' | 'strict';
-
-    /**
-     * Whether to block supporting network access entirely.
-     *
-     * When true, profiles with `supportingNetwork: 'allowed'` are rejected.
-     */
-    blockSupportingNetwork: boolean;
-  };
-
-  /**
-   * Network policy restrictions.
-   *
-   * Controls which providers and adapters are allowed.
-   */
-  network: {
-    /**
-     * Blocked provider classes.
-     *
-     * Profiles using these provider classes are rejected during validation.
-     */
-    blockedProviderClasses: Array<'local' | 'private-network' | 'cloud'>;
-
-    /**
-     * Blocked adapter types.
-     *
-     * Profiles using these adapter types are rejected during validation.
-     */
-    blockedAdapters: Array<'native-claude' | 'anthropic-compatible' | 'openai-compatible' | 'ollama' | 'generic-command'>;
-
-    /**
-     * SSL/TLS requirements for HTTP endpoints.
-     */
-    tls: {
-      /**
-       * Whether to require TLS (HTTPS) for all HTTP endpoints.
-       */
-      required: boolean;
-
-      /**
-       * Whether to allow self-signed certificates.
-       */
-      allowSelfSigned: boolean;
-
-      /**
-       * List of allowed endpoint hostnames/addresses.
-       *
-       * Empty list means all endpoints are allowed.
-       */
-      allowedHosts?: string[];
-
-      /**
-       * List of blocked endpoint hostnames/addresses.
-       *
-     */
-      blockedHosts?: string[];
-    };
-  };
-
-  /**
-   * Permission policy restrictions.
-   *
-   * Controls maximum permission modes allowed in profiles.
-   */
-  permissions: {
-    /**
-     * Maximum permission mode allowed.
-     *
-     * Profiles attempting to use a higher permission mode are rejected.
-     */
-    max: 'review-only' | 'edit-only' | 'edit-and-command';
-
-    /**
-     * Require workspace path restrictions.
-     *
-     * When true, profiles without `workspacePaths` are rejected.
-     */
-    requireWorkspacePaths: boolean;
-
-    /**
-     * Default permission mode for new profiles.
-     */
-    default: 'review-only' | 'edit-only' | 'edit-and-command';
-  };
-
-  /**
-   * Handoff policy.
-   *
-   * Controls how session handoff is managed between profiles.
-   */
-  handoff: {
-    /**
-     * Allow handoff to different provider classes.
-     *
-     * When false, handoff only allowed between same provider class.
-     */
-    allowCrossProvider: boolean;
-
-    /**
-     * Default handoff mode.
-     *
-     * - full: Transfer complete transcript
-     * - summary: Transfer summarized transcript
-     * - export: Require user-mediated export/import
-     * - none: No context transfer
-     */
-    defaultMode: 'full' | 'summary' | 'export' | 'none';
-
-    /**
-     * Metadata to track for sessions.
-     */
-    trackMetadata: boolean;
-  };
-
-  /**
-   * Audit and logging policy.
-   *
-     * Controls what is logged and for how long.
-   */
-  audit: {
-    /**
-     * Whether to enable audit logging.
-     */
-    enabled: boolean;
-
-    /**
-     * Audit log retention period (days).
-     *
-     * 0 means logs are never deleted (until disk full).
-     */
-    retentionDays: number;
-
-    /**
-     * Maximum log file size (in MB) before rotation.
-     */
-    maxFileSizeMb: number;
-
-    /**
-     * What to log in audit trails.
-     */
-    events: {
-      /** Log profile activations/deactivations */
-      profileActivations: boolean;
-
-      /** Log command execution requests */
-      commandExecutions: boolean;
-
-      /** Log tool execution requests */
-      toolExecutions: boolean;
-
-      /** Log handoff events */
-      handoffs: boolean;
-
-      /** Log policy violations */
-      policyViolations: boolean;
-    };
-  };
+export interface ValidationError {
+  field: string;
+  message: string;
 }
 
 /**
- * Result of policy parsing and validation.
- *
- * Includes the parsed policy and any validation errors.
+ * Parse result.
  */
-export interface PolicyParseResult {
-  /**
-   * The parsed workspace policy.
-   */
-  policy: WorkspacePolicy;
-
-  /**
-   * Whether parsing was successful.
-   */
-  valid: boolean;
-
-  /** Parsing validation errors (blocking) */
-  errors: ValidationError[];
-
-  /** Parsing validation warnings (non-blocking) */
-  warnings: ValidationWarning[];
+export interface ParseResult {
+  success: boolean;
+  policy?: WorkspacePolicy;
+  errors?: ValidationError[];
 }
+
+/**
+ * Concurrency default enum.
+ */
+type ConcurrencyDefault = 'concurrent' | 'exclusive-writer';
+
+/**
+ * Conflict action enum.
+ */
+type ConflictAction = 'warn' | 'block';
+
+// ============================================================
+// VALIDATION CONSTANTS
+// ============================================================
+
+/**
+ * Supported schema versions.
+ */
+const SUPPORTED_SCHEMA_VERSIONS = [1];
+
+/**
+ * Valid privacy modes.
+ */
+const VALID_PRIVACY_MODES: Set<string> = new Set([
+  'unrestricted',
+  'guarded',
+  'strict',
+]);
+
+/**
+ * Valid cloud model request default actions.
+ */
+const VALID_CLOUD_MODEL_REQUEST_ACTIONS: Set<string> = new Set([
+  'require-confirmation',
+  'block',
+  'allow',
+]);
+
+/**
+ * Valid handoff modes.
+ */
+const VALID_HANDOFF_MODES: Set<string> = new Set([
+  'full',
+  'summary',
+  'none',
+]);
+
+/**
+ * Valid concurrency defaults.
+ */
+const VALID_CONCURRENCY_DEFAULTS: Set<string> = new Set([
+  'concurrent',
+  'exclusive-writer',
+]);
+
+/**
+ * Valid conflict actions.
+ */
+const VALID_CONFLICT_ACTIONS: Set<string> = new Set(['warn', 'block']);
 
 // ============================================================
 // POLICY PARSER CLASS
 // ============================================================
 
 /**
- * Parses workspace policy from YAML configuration.
+ * Policy Parser
  *
- * Usage:
- * ```typescript
- * const parser = new PolicyParser();
- * const result = parser.parse(policyYamlString);
+ * Parses and validates workspace policy YAML files.
  *
- * if (!result.valid) {
- *   result.errors.forEach(error => console.error(error.message));
- * }
- * ```
+ * Key responsibilities:
+ * - Parse YAML strings into workspace policy objects
+ * - Validate schema version
+ * - Validate privacy mode and cloud model request default action
+ * - Validate handoff configuration (allowed modes, default mode)
+ * - Validate concurrency configuration (default, conflict action)
+ * - Validate profile restrictions (allowed template IDs)
+ * - Provide detailed validation errors for debugging
  *
- * Policy structure validation:
- * - All required fields must be present
- * - Enum values must be valid
- * - Policy defaults applied for optional fields
- * - No circular dependencies or contradictory rules
- *
- * NOTE: This module does NOT load files directly. The vscode layer
- * reads workspace_policy.yaml and passes the YAML string here.
+ * Per-user visibility only - no cross-user tracking per FR-044 clarification.
  */
 export class PolicyParser {
   /**
    * Parse workspace policy from YAML string.
    *
-   * @param policyYaml - YAML string from workspace_policy.yaml
-   * @returns Parsed policy with validation results
+   * @param yamlString - YAML string to parse
+   * @returns Parse result with policy or errors
    */
-  parse(policyYaml: string): PolicyParseResult {
-    const errors: ValidationError[] = [];
-    const warnings: ValidationWarning[] = [];
+  parse(yamlString: string): WorkspacePolicy {
+    let parsed: unknown;
 
-    // Note: YAML parsing is done externally (by vscode layer or yaml library)
-    // This method validates the parsed object structure and defaults
-    const policy: WorkspacePolicy = this.parseYamlToObject(policyYaml);
+    try {
+      parsed = YAML.parse(yamlString);
+    } catch (error) {
+      throw new Error(`Failed to parse YAML: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
 
-    // Validate parsed policy
-    this.validatePolicyStructure(policy, errors, warnings);
+    if (!parsed || typeof parsed !== 'object') {
+      throw new Error('Invalid YAML: expected object');
+    }
 
-    // Apply defaults for missing optional fields
-    this.applyDefaults(policy, warnings);
+    // Validate type
+    const obj = parsed as Record<string, unknown>;
 
-    // Check for contradictory policy rules
-    this.checkContradictions(policy, errors, warnings);
+    // Validate required top-level fields
+    this.validateSchemaVersion(obj);
 
-    const valid = errors.length === 0;
+    const privacy = this.validatePrivacySection(obj);
+    const concurrency = obj.concurrency ? this.validateConcurrencySection(obj.concurrency) : undefined;
+    const profiles = obj.profiles ? this.validateProfilesSection(obj.profiles) : undefined;
 
     return {
-      policy,
-      valid,
-      errors: [...errors],
-      warnings: [...warnings],
+      privacy,
+      concurrency,
+      profiles,
     };
   }
 
+  /**
+   * Serializes workspace policy to YAML string.
+   *
+   * @param policy - Workspace policy to serialize
+   * @returns YAML string
+   */
+  serialize(policy: WorkspacePolicy): string {
+    return YAML.stringify(policy);
+  }
+
   // ============================================================
-  // YAML PARSING METHOD
+  // VALIDATION METHODS
   // ============================================================
 
   /**
-   * Parse YAML string to WorkspacePolicy object.
+   * Validate schema version.
    *
-   * NOTE: This is a stub implementation that would integrate
-   * with a YAML parser library. The vscode layer handles actual
-   * YAML parsing, but this structure is maintained for type safety.
-   *
-   * @param yaml - YAML string
-   * @returns Parsed WorkspacePolicy object
+   * @param obj - Parsed YAML object
+   * @throws Error if invalid
    */
-  private parseYamlToObject(_yaml: string): WorkspacePolicy {
-    // Stub implementation - in real usage, this would use yaml.parse()
-    // or similar library. The vscode layer does this work.
-    // For now, return a minimal valid policy for type checking.
-    const minimalPolicy: WorkspacePolicy = {
-      workspace: {
-        id: 'default',
-      },
-      privacy: {
-        mode: 'unrestricted',
-        blockSupportingNetwork: false,
-      },
-      network: {
-        blockedProviderClasses: [],
-        blockedAdapters: [],
-        tls: {
-          required: true,
-          allowSelfSigned: false,
-        },
-      },
-      permissions: {
-        max: 'edit-and-command',
-        requireWorkspacePaths: false,
-        default: 'review-only',
-      },
-      handoff: {
-        allowCrossProvider: true,
-        defaultMode: 'export',
-        trackMetadata: true,
-      },
-      audit: {
-        enabled: true,
-        retentionDays: 30,
-        maxFileSizeMb: 10,
-        events: {
-          profileActivations: true,
-          commandExecutions: true,
-          toolExecutions: true,
-          handoffs: true,
-          policyViolations: true,
-        },
-      },
+  private validateSchemaVersion(obj: Record<string, unknown>): void {
+    const schemaVersion = obj.schemaVersion;
+
+    if (schemaVersion === undefined || schemaVersion === null) {
+      throw new Error('Required field "schemaVersion" is missing');
+    }
+
+    if (typeof schemaVersion !== 'number') {
+      throw new Error(`Invalid schema version: expected number, got ${typeof schemaVersion}`);
+    }
+
+    if (!SUPPORTED_SCHEMA_VERSIONS.includes(schemaVersion)) {
+      throw new Error(
+        `Unsupported schema version: ${schemaVersion}. Supported versions: ${SUPPORTED_SCHEMA_VERSIONS.join(', ')}`,
+      );
+    }
+  }
+
+  /**
+   * Validate privacy section.
+   *
+   * @param obj - Parsed YAML object
+   * @returns Validated privacy section
+   * @throws Error if invalid
+   */
+  private validatePrivacySection(obj: Record<string, unknown>): Required<WorkspacePolicy>['privacy'] {
+    const privacy = obj.privacy;
+
+    if (privacy === undefined || privacy === null) {
+      throw new Error('Required field "privacy" is missing');
+    }
+
+    if (typeof privacy !== 'object') {
+      throw new Error(`Invalid privacy section: expected object, got ${typeof privacy}`);
+    }
+
+    const privacyObj = privacy as Record<string, unknown>;
+
+    // Validate mode
+    const mode = this.validatePrivacyMode(privacyObj);
+
+    // Validate cloudModelRequests
+    const cloudModelRequests = this.validateCloudModelRequests(privacyObj);
+
+    // Validate optional handoff section
+    const handoff = privacyObj.handoff ? this.validateHandoffSection(privacyObj.handoff) : undefined;
+
+    // Validate optional policyChanges section
+    const policyChanges = privacyObj.policyChanges
+      ? this.validatePolicyChangesSection(privacyObj.policyChanges)
+      : undefined;
+
+    return {
+      mode,
+      cloudModelRequests,
+      handoff,
+      policyChanges,
     };
-
-    // In real implementation: parse yaml string and merge with defaults
-    // const parsed = yaml.parse(yaml);
-    // return this.mergeWithDefaults(parsed);
-
-    return minimalPolicy;
-  }
-
-  // ============================================================
-  // POLICY VALIDATION METHODS
-  // ============================================================
-
-  /**
-   * Validate policy structure and required fields.
-   */
-  private validatePolicyStructure(
-    policy: WorkspacePolicy,
-    errors: ValidationError[],
-    _warnings: ValidationWarning[],
-  ): void {
-    // Validate workspace section
-    if (!policy?.workspace?.id) {
-      errors.push({
-        field: 'workspace.id',
-        message: 'Workspace ID is required',
-      });
-    }
-
-    if (policy.workspace && !policy.workspace.id?.trim()) {
-      errors.push({
-        field: 'workspace.id',
-        message: 'Workspace ID cannot be empty',
-      });
-    }
-
-    // Validate privacy mode
-    if (!policy?.privacy?.mode) {
-      errors.push({
-        field: 'privacy.mode',
-        message: 'Privacy mode is required',
-      });
-    } else {
-      const validModes: Array<'unrestricted' | 'guarded' | 'strict'> = [
-        'unrestricted',
-        'guarded',
-        'strict',
-      ];
-
-      if (!validModes.includes(policy.privacy.mode)) {
-        errors.push({
-          field: 'privacy.mode',
-          message: `Invalid privacy mode: ${policy.privacy.mode}. Must be one of: ${validModes.join(', ')}`,
-        });
-      }
-    }
-
-    // Validate network section
-    if (!policy.network) {
-      errors.push({
-        field: 'network',
-        message: 'Network section is required',
-      });
-    } else {
-      if (!policy.network.blockedProviderClasses) {
-        errors.push({
-          field: 'network.blockedProviderClasses',
-          message: 'Blocked provider classes array is required',
-        });
-      }
-
-      if (!policy.network.blockedAdapters) {
-        errors.push({
-          field: 'network.blockedAdapters',
-          message: 'Blocked adapters array is required',
-        });
-      }
-
-      if (!policy.network.tls) {
-        errors.push({
-          field: 'network.tls',
-          message: 'TLS configuration is required',
-        });
-      }
-    }
-
-    // Validate permissions section
-    if (!policy.permissions) {
-      errors.push({
-        field: 'permissions',
-        message: 'Permissions section is required',
-      });
-    } else {
-      const validMax: Array<'review-only' | 'edit-only' | 'edit-and-command'> = [
-        'review-only',
-        'edit-only',
-        'edit-and-command',
-      ];
-
-      if (policy.permissions.max && !validMax.includes(policy.permissions.max)) {
-        errors.push({
-          field: 'permissions.max',
-          message: `Invalid max permission mode: ${policy.permissions.max}`,
-        });
-      }
-    }
-
-    // Validate handoff section
-    if (!policy.handoff) {
-      errors.push({
-        field: 'handoff',
-        message: 'Handoff section is required',
-      });
-    }
-
-    // Validate audit section
-    if (!policy.audit) {
-      errors.push({
-        field: 'audit',
-        message: 'Audit section is required',
-      });
-    } else {
-      if (policy.audit.retentionDays && policy.audit.retentionDays < 0) {
-        errors.push({
-          field: 'audit.retentionDays',
-          message: 'Retention days cannot be negative',
-        });
-      }
-
-      if (policy.audit.maxFileSizeMb && policy.audit.maxFileSizeMb <= 0) {
-        errors.push({
-          field: 'audit.maxFileSizeMb',
-          message: 'Max file size must be greater than 0',
-        });
-      }
-    }
   }
 
   /**
-   * Apply defaults for optional fields.
+   * Validate privacy mode.
+   *
+   * @param privacyObj - Privacy section object
+   * @returns Valid privacy mode
+   * @throws Error if invalid
    */
-  private applyDefaults(
-    _policy: WorkspacePolicy,
-    _warnings: ValidationWarning[],
-  ): void {
-    // No defaults to apply - policy is comprehensive
-    // All fields are required for operation
+  private validatePrivacyMode(privacyObj: Record<string, unknown>): Required<WorkspacePolicy>['privacy']['mode'] {
+    const mode = privacyObj.mode;
+
+    if (mode === undefined || mode === null) {
+      throw new Error('Required field "privacy.mode" is missing');
+    }
+
+    if (typeof mode !== 'string') {
+      throw new Error(`Invalid privacy mode: expected string, got ${typeof mode}`);
+    }
+
+    if (!VALID_PRIVACY_MODES.has(mode)) {
+      throw new Error(
+        `Invalid privacy mode: "${mode}". Valid modes: ${Array.from(VALID_PRIVACY_MODES).join(', ')}`,
+      );
+    }
+
+    return mode as Required<WorkspacePolicy>['privacy']['mode'];
   }
 
   /**
-   * Check for contradictory policy rules.
+   * Validate cloud model requests section.
+   *
+   * @param privacyObj - Privacy section object
+   * @returns Validated cloudModelRequests section
+   * @throws Error if invalid
    */
-  private checkContradictions(
-    policy: WorkspacePolicy,
-    errors: ValidationError[],
-    warnings: ValidationWarning[],
-  ): void {
-    // Check strict privacy mode with cross-provider handoff
-    if (
-      policy.privacy.mode === 'strict' &&
-      policy.handoff.allowCrossProvider
-    ) {
-      errors.push({
-        field: 'privacy.mode / handoff.allowCrossProvider',
-        message: 'Strict privacy mode contradicts cross-provider handoff',
-        suggestion: 'Disable cross-provider handoff or relax privacy mode',
-      });
+  private validateCloudModelRequests(
+    privacyObj: Record<string, unknown>,
+  ): Required<WorkspacePolicy>['privacy']['cloudModelRequests'] {
+    const cloudModelRequests = privacyObj.cloudModelRequests;
+
+    if (cloudModelRequests === undefined || cloudModelRequests === null) {
+      throw new Error('Required field "privacy.cloudModelRequests" is missing');
     }
 
-    // Check audit disabled with event tracking enabled
-    if (
-      !policy.audit.enabled &&
-      (policy.audit.events.profileActivations ||
-        policy.audit.events.commandExecutions ||
-        policy.audit.events.toolExecutions ||
-        policy.audit.events.handoffs)
-    ) {
-      warnings.push({
-        field: 'audit.enabled',
-        message: 'Audit is disabled but event tracking is configured',
-      });
+    if (typeof cloudModelRequests !== 'object') {
+      throw new Error(
+        `Invalid cloudModelRequests: expected object, got ${typeof cloudModelRequests}`,
+      );
     }
+
+    const cmrObj = cloudModelRequests as Record<string, unknown>;
+
+    const defaultAction = cmrObj.default;
+
+    if (defaultAction === undefined || defaultAction === null) {
+      throw new Error('Required field "privacy.cloudModelRequests.default" is missing');
+    }
+
+    if (typeof defaultAction !== 'string') {
+      throw new Error(
+        `Invalid cloud model request default action: expected string, got ${typeof defaultAction}`,
+      );
+    }
+
+    if (!VALID_CLOUD_MODEL_REQUEST_ACTIONS.has(defaultAction)) {
+      throw new Error(
+        `Invalid cloud model request default action: "${defaultAction}". Valid actions: ${Array.from(
+          VALID_CLOUD_MODEL_REQUEST_ACTIONS,
+        ).join(', ')}`,
+      );
+    }
+
+    return {
+      default: defaultAction as Required<WorkspacePolicy>['privacy']['cloudModelRequests']['default'],
+    };
+  }
+
+  /**
+   * Validate handoff section.
+   *
+   * @param handoffObj - Handoff section object
+   * @returns Validated handoff section
+   * @throws Error if invalid
+   */
+  private validateHandoffSection(handoffObj: unknown): Required<WorkspacePolicy>['privacy']['handoff'] {
+    if (typeof handoffObj !== 'object') {
+      throw new Error(`Invalid handoff: expected object, got ${typeof handoffObj}`);
+    }
+
+    const handoff = handoffObj as Record<string, unknown>;
+
+    // Validate allowedModes if present
+    const allowedModes: string[] = [];
+    if (handoff.allowedModes !== undefined && handoff.allowedModes !== null) {
+      if (!Array.isArray(handoff.allowedModes)) {
+        throw new Error(
+          `Invalid handoff.allowedModes: expected array, got ${typeof handoff.allowedModes}`,
+        );
+      }
+
+      for (const mode of handoff.allowedModes) {
+        if (typeof mode !== 'string') {
+          throw new Error(`Invalid handoff allowed mode: expected string, got ${typeof mode}`);
+        }
+
+        if (!VALID_HANDOFF_MODES.has(mode)) {
+          throw new Error(
+            `Invalid handoff mode: "${mode}". Valid modes: ${Array.from(VALID_HANDOFF_MODES).join(', ')}`,
+          );
+        }
+
+        allowedModes.push(mode);
+      }
+    }
+
+    // Validate defaultMode if present
+    let defaultMode: HandoffMode = 'none';
+    const defaultModeRaw = handoff.defaultMode;
+    if (defaultModeRaw !== undefined && defaultModeRaw !== null) {
+      if (typeof defaultModeRaw !== 'string') {
+        throw new Error(
+          `Invalid handoff.defaultMode: expected string, got ${typeof defaultModeRaw}`,
+        );
+      }
+
+      if (!VALID_HANDOFF_MODES.has(defaultModeRaw)) {
+        throw new Error(
+          `Invalid handoff default mode: "${defaultModeRaw}". Valid modes: ${Array.from(
+            VALID_HANDOFF_MODES,
+          ).join(', ')}`,
+        );
+      }
+
+      // Check if default mode is in allowed modes
+      if (allowedModes.length > 0 && !allowedModes.includes(defaultModeRaw)) {
+        throw new Error(
+          `Invalid handoff default mode: "${defaultModeRaw}" is not in allowed modes [${allowedModes.join(', ')}]`,
+        );
+      }
+
+      defaultMode = defaultModeRaw as HandoffMode;
+    }
+
+    return {
+      allowedModes: allowedModes.length > 0 ? allowedModes as HandoffMode[] : undefined,
+      defaultMode,
+    };
+  }
+
+  /**
+   * Validate policy changes section.
+   *
+   * @param policyChangesObj - Policy changes section object
+   * @returns Validated policy changes section
+   * @throws Error if invalid
+   */
+  private validatePolicyChangesSection(
+    policyChangesObj: unknown,
+  ): Required<WorkspacePolicy>['privacy']['policyChanges'] {
+    if (typeof policyChangesObj !== 'object') {
+      throw new Error(
+        `Invalid policyChanges: expected object, got ${typeof policyChangesObj}`,
+      );
+    }
+
+    const policyChanges = policyChangesObj as Record<string, unknown>;
+
+    return {
+      requireConfirmation: policyChanges.requireConfirmation === true,
+      requireReason: policyChanges.requireReason === true,
+      revertAfterMinutes:
+        typeof policyChanges.revertAfterMinutes === 'number' && policyChanges.revertAfterMinutes > 0
+          ? policyChanges.revertAfterMinutes
+          : null,
+      requireSecondApprover: policyChanges.requireSecondApprover === true,
+    };
+  }
+
+  /**
+   * Validate concurrency section.
+   *
+   * @param concurrencyObj - Concurrency section object
+   * @returns Validated concurrency section
+   * @throws Error if invalid
+   */
+  private validateConcurrencySection(concurrencyObj: unknown): WorkspacePolicy['concurrency'] {
+    if (typeof concurrencyObj !== 'object') {
+      throw new Error(
+        `Invalid concurrency: expected object, got ${typeof concurrencyObj}`,
+      );
+    }
+
+    const concurrency = concurrencyObj as Record<string, unknown>;
+
+    // Validate default if present
+    let defaultVal: ConcurrencyDefault = 'concurrent';
+    const defaultRaw = concurrency.default;
+    if (defaultRaw !== undefined && defaultRaw !== null) {
+      if (typeof defaultRaw !== 'string') {
+        throw new Error(
+          `Invalid concurrency.default: expected string, got ${typeof defaultRaw}`,
+        );
+      }
+
+      if (!VALID_CONCURRENCY_DEFAULTS.has(defaultRaw)) {
+        throw new Error(
+          `Invalid concurrency default: "${defaultRaw}". Valid values: ${Array.from(
+            VALID_CONCURRENCY_DEFAULTS,
+          ).join(', ')}`,
+        );
+      }
+
+      defaultVal = defaultRaw as ConcurrencyDefault;
+    }
+
+    // Validate conflictAction if present
+    let conflictAction: ConflictAction = 'warn';
+    const conflictActionRaw = concurrency.conflictAction;
+    if (conflictActionRaw !== undefined && conflictActionRaw !== null) {
+      if (typeof conflictActionRaw !== 'string') {
+        throw new Error(
+          `Invalid concurrency.conflictAction: expected string, got ${typeof conflictActionRaw}`,
+        );
+      }
+
+      if (!VALID_CONFLICT_ACTIONS.has(conflictActionRaw)) {
+        throw new Error(
+          `Invalid conflict action: "${conflictActionRaw}". Valid values: ${Array.from(
+            VALID_CONFLICT_ACTIONS,
+          ).join(', ')}`,
+        );
+      }
+
+      conflictAction = conflictActionRaw as ConflictAction;
+    }
+
+    return {
+      default: defaultVal,
+      conflictAction,
+      supportsWorktrees: concurrency.supportsWorktrees === true,
+      checkpointBeforeMutation: concurrency.checkpointBeforeMutation === true,
+    };
+  }
+
+  /**
+   * Validate profiles section.
+   *
+   * @param profilesObj - Profiles section object
+   * @returns Validated profiles section
+   * @throws Error if invalid
+   */
+  private validateProfilesSection(profilesObj: unknown): WorkspacePolicy['profiles'] {
+    if (typeof profilesObj !== 'object') {
+      throw new Error(`Invalid profiles: expected object, got ${typeof profilesObj}`);
+    }
+
+    const profiles = profilesObj as Record<string, unknown>;
+
+    // Validate allowedTemplateIds if present
+    const allowedTemplateIds: string[] = [];
+    if (profiles.allowedTemplateIds !== undefined && profiles.allowedTemplateIds !== null) {
+      if (!Array.isArray(profiles.allowedTemplateIds)) {
+        throw new Error(
+          `Invalid profiles.allowedTemplateIds: expected array, got ${typeof profiles.allowedTemplateIds}`,
+        );
+      }
+
+      for (const templateId of profiles.allowedTemplateIds) {
+        if (typeof templateId !== 'string') {
+          throw new Error(
+            `Invalid profile template ID: expected string, got ${typeof templateId}`,
+          );
+        }
+
+        allowedTemplateIds.push(templateId);
+      }
+    }
+
+    return {
+      allowedTemplateIds,
+    };
   }
 }
 
-// ============================================================
-// UTILITY FUNCTIONS
-// ============================================================
-
-/**
- * Parse workspace policy from YAML string.
- *
- * @param policyYaml - YAML string from workspace_policy.yaml
- * @returns Parsed policy with validation results
- */
-export function parseWorkspacePolicy(
-  policyYaml: string,
-): PolicyParseResult {
-  const parser = new PolicyParser();
-  return parser.parse(policyYaml);
-}
-
-/**
- * Validate that a policy object matches the WorkspacePolicy type.
- *
- * Utility function for type checking at runtime.
- *
- * @param policy - Policy object to validate
- * @returns true if valid WorkspacePolicy, false otherwise
- */
-export function isValidWorkspacePolicy(
-  policy: unknown,
-): policy is WorkspacePolicy {
-  // Basic type guard - checks for required top-level structure
-  if (typeof policy !== 'object' || policy === null) {
-    return false;
-  }
-
-  const p = policy as Partial<WorkspacePolicy>;
-
-  return (
-    typeof p.workspace === 'object' &&
-    typeof p.privacy === 'object' &&
-    typeof p.network === 'object' &&
-    typeof p.permissions === 'object' &&
-    typeof p.handoff === 'object' &&
-    typeof p.audit === 'object'
-  );
-}

@@ -10,10 +10,26 @@
  */
 
 import * as vscode from 'vscode';
+import { loadConfiguration, validateConfiguration } from '../core/routing/routing-config';
+import { Logger, LogLevel } from '../utils/logger';
+import type { ModelSource } from '../core/routing/routing-engine';
+import { createStatusBarItem, show as showStatusBar, dispose as disposeStatusBar } from './views/quota-status-bar';
+import { showDashboardCommand } from './views/quota-dashboard';
+
 
 // ============================================================
 // VS Code Integration Layer
 // ============================================================
+
+// Logger instance for extension
+const logger = new Logger(LogLevel.INFO);
+
+// Alert state to avoid duplicate notifications
+let hasNotifiedAlertThreshold = false;
+
+// Routing transition tracking
+let lastRoutingSource: ModelSource | null = null;
+let hasNotifiedTransitionToApiCredits = false;
 
 /**
  * Extension activation.
@@ -31,6 +47,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   // Register configuration watchers
   registerConfigurationWatchers(context);
 
+  // Initialize routing configuration
+  await initializeRoutingConfiguration(context);
+
+  // Initialize status bar
+  initializeStatusBar();
+
   // Show welcome notification on first activation
   await showWelcomeNotification(context);
 
@@ -44,6 +66,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
  */
 export async function deactivate(): Promise<void> {
   console.log('[Claude-Switcher] Extension is deactivating...');
+
+  // Dispose of status bar
+  disposeStatusBar();
 
   // Clean up resources
   // (Disposables are automatically cleaned up via their subscriptions)
@@ -90,6 +115,9 @@ function registerCommands(context: vscode.ExtensionContext): void {
   registerCommand(context, 'claudeSwitcher.showActivityLedger', showActivityLedgerCommand);
   registerCommand(context, 'claudeSwitcher.manageSecrets', manageSecretsCommand);
   registerCommand(context, 'claudeSwitcher.exportData', exportDataCommand);
+
+  // Model Cost Optimization commands
+  registerCommand(context, 'claudeSwitcher.routing.showQuota', showDashboardCommand);
 }
 
 /**
@@ -118,16 +146,143 @@ function registerCommand(
  * @param context - Extension context
  */
 function registerConfigurationWatchers(context: vscode.ExtensionContext): void {
-  // Note: This will be implemented with WorkspaceConfigurationManager
-  // For now, this is a placeholder
-  const disposable = vscode.workspace.onDidChangeConfiguration((event) => {
-    if (event.affectsConfiguration('claudeSwitcher')) {
-      console.log('[Claude-Switcher] Configuration changed');
-      // Handle configuration change
+  const disposable = vscode.workspace.onDidChangeConfiguration(async (event) => {
+    if (event.affectsConfiguration('claudeSwitcher.routing')) {
+      await handleRoutingConfigurationChange();
     }
   });
 
   context.subscriptions.push(disposable);
+}
+
+/**
+ * Initialize routing configuration on extension startup.
+ */
+async function initializeRoutingConfiguration(_context: vscode.ExtensionContext): Promise<void> {
+  try {
+    const config = vscode.workspace.getConfiguration('claudeSwitcher.routing');
+    const routingConfig = await loadConfiguration(config);
+
+    const validation = validateConfiguration(routingConfig, logger);
+
+    if (!validation.valid) {
+      logger.warn(
+        'ExtensionInit',
+        `Routing configuration has validation errors: ${validation.errors.join('; ')}`
+      );
+      vscode.window.showWarningMessage(
+        `Claude Switcher routing configuration has errors. Check settings.`
+      );
+    } else {
+      logger.info('ExtensionInit', 'Routing configuration loaded successfully');
+    }
+  } catch (error) {
+    logger.error(
+      'ExtensionInit',
+      `Failed to initialize routing configuration: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
+/**
+ * Handle routing configuration changes.
+ */
+async function handleRoutingConfigurationChange(): Promise<void> {
+  try {
+    logger.info('RoutingConfig', 'Routing configuration changed, reloading...');
+
+    const config = vscode.workspace.getConfiguration('claudeSwitcher.routing');
+    const routingConfig = await loadConfiguration(config);
+
+    const validation = validateConfiguration(routingConfig, logger);
+
+    if (!validation.valid) {
+      logger.warn(
+        'RoutingConfig',
+        `Configuration validation failed: ${validation.errors.join('; ')}`
+      );
+
+      // Show warning message to user
+      vscode.window.showWarningMessage(
+        `Claude Switcher routing configuration is invalid. ${validation.errors.join('; ')}`
+      );
+    } else {
+      logger.info('RoutingConfig', 'Routing configuration reloaded successfully');
+    }
+  } catch (error) {
+    logger.error(
+      'RoutingConfig',
+      `Failed to reload routing configuration: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
+}
+
+/**
+ * Initialize status bar widget.
+ */
+function initializeStatusBar(): void {
+  createStatusBarItem();
+  showStatusBar();
+
+  // Initial status will be updated when quota data is available
+  logger.info('StatusBar', 'Status bar widget initialized');
+}
+
+/**
+ * Check alert threshold and show notification if needed.
+ *
+ * This should be called after each quota usage increment.
+ *
+ * @param percentUsed - Current quota percentage used
+ * @param alertThreshold - Alert threshold percentage from config
+ */
+export async function checkAlertThreshold(
+  percentUsed: number,
+  alertThreshold: number
+): Promise<void> {
+  if (percentUsed >= alertThreshold && !hasNotifiedAlertThreshold) {
+    const message = `Subscription quota at ${Math.round(percentUsed)}% used. Approaching limit. Consider reducing usage or enabling auto-fallback to Ollama.`;
+
+    logger.warn('QuotaAlert', message);
+    vscode.window.showInformationMessage(message);
+
+    // Set flagged to avoid duplicate notifications
+    hasNotifiedAlertThreshold = true;
+  } else if (percentUsed < alertThreshold / 2) {
+    // Reset alert flag when usage drops significantly below threshold
+    // (e.g., after rolling window reset)
+    hasNotifiedAlertThreshold = false;
+  }
+}
+
+/**
+ * Check routing transition and show notification if source changes to API credits.
+ *
+ * This should be called after each routing decision.
+ *
+ * @param currentSource - Current routing source ('subscription' | 'api-credits' | 'ollama')
+ */
+export function checkRoutingTransition(currentSource: ModelSource): void {
+  const previousSource = lastRoutingSource;
+
+  // Detect transition from subscription to api-credits
+  if (previousSource === 'subscription' && currentSource === 'api-credits' && !hasNotifiedTransitionToApiCredits) {
+    const message = 'Routing change: subscription exhausted → API credits';
+
+    logger.warn('RoutingTransition', message);
+    void vscode.window.showInformationMessage(message);
+
+    // Set flagged to avoid duplicate notifications
+    hasNotifiedTransitionToApiCredits = true;
+  }
+
+  // Reset notification flag when routing returns to subscription
+  if (currentSource === 'subscription') {
+    hasNotifiedTransitionToApiCredits = false;
+  }
+
+  // Update last routing source
+  lastRoutingSource = currentSource;
 }
 
 // ============================================================
