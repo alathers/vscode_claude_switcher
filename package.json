@@ -29,7 +29,9 @@
     "onCommand:claudeSwitcher.showPolicyEditor",
     "onCommand:claudeSwitcher.routing.exportHistory",
     "onCommand:claudeSwitcher.routing.resetQuota",
-    "onCommand:claudeSwitcher.routing.configure"
+    "onCommand:claudeSwitcher.routing.configure",
+    "onCommand:claudeSwitcher.routing.showQuota",
+    "onCommand:claudeSwitcher.routing.validateHarvey"
   ],
   "contributes": {
     "commands": [
@@ -121,6 +123,16 @@
       {
         "command": "claudeSwitcher.routing.configure",
         "title": "Claude Switcher: Configure Routing",
+        "category": "Claude Switcher"
+      },
+      {
+        "command": "claudeSwitcher.routing.showQuota",
+        "title": "Claude Switcher: Show Quota Dashboard",
+        "category": "Claude Switcher"
+      },
+      {
+        "command": "claudeSwitcher.routing.validateHarvey",
+        "title": "Claude Switcher: Validate Harvey Connection",
         "category": "Claude Switcher"
       }
     ],

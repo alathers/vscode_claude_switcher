@@ -130,9 +130,54 @@ export function registerRoutingCommands(context: vscode.ExtensionContext): void 
     }
   );
 
+  // T054/T025: Show quota dashboard command
+  const showQuotaCommand = vscode.commands.registerCommand(
+    'claudeSwitcher.routing.showQuota',
+    async () => {
+      // TODO: Implement quota dashboard webview (T026)
+      // For now, show a placeholder message
+      await vscode.window.showInformationMessage(
+        'Quota dashboard coming soon. Configuration available in Settings.'
+      );
+    }
+  );
+
+  // T049: Validate Harvey connectivity command
+  const validateHarveyCommand = vscode.commands.registerCommand(
+    'claudeSwitcher.routing.validateHarvey',
+    async () => {
+      try {
+        // Get Harvey baseUrl from configuration
+        const config = vscode.workspace.getConfiguration('claudeSwitcher.routing');
+        const baseUrl = config.get<string>('harvey.baseUrl', 'http://localhost:11434');
+
+        // Try to connect to Harvey health endpoint
+        const healthUrl = `${baseUrl}/health`;
+        const response = await fetch(healthUrl);
+
+        if (response.ok) {
+          await vscode.window.showInformationMessage(
+            `Harvey service reachable and responding at ${baseUrl}`
+          );
+        } else {
+          await vscode.window.showErrorMessage(
+            `Cannot connect to Harvey: ${response.statusText}. Troubleshooting: 1. Verify Harvey running: 'harvey serve --port 11434' 2. Check baseUrl in settings 3. Check firewall rules`
+          );
+        }
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        await vscode.window.showErrorMessage(
+          `Cannot connect to Harvey: ${errorMessage}. Troubleshooting: 1. Verify Harvey running: 'harvey serve --port 11434' 2. Check baseUrl in settings 3. Check firewall rules`
+        );
+      }
+    }
+  );
+
   context.subscriptions.push(
     exportHistoryCommand,
     resetQuotaCommand,
-    configureRoutingCommand
+    configureRoutingCommand,
+    showQuotaCommand,
+    validateHarveyCommand
   );
 }

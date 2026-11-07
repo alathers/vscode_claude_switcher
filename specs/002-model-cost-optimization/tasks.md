@@ -197,15 +197,15 @@
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T051 [P] Implement export history command in `src/vscode/commands/routing-commands.ts`: create command 'claudeSwitcher.routing.exportHistory', prompt user for save location via vscode.window.showSaveDialog with default filename 'routing-history-export.json', call routing-history.readDecision() to load all daily records (30 days), merge into single JSON array with all RoutingDecision objects, write to selected file path using Node.js fs.writeFileSync, show success message "Exported {count} routing records to {path}"
+- [X] T051 [P] Implement export history command in `src/vscode/commands/routing-commands.ts`: create command 'claudeSwitcher.routing.exportHistory', prompt user for save location via vscode.window.showSaveDialog with default filename 'routing-history-export.json', call routing-history.readDecision() to load all daily records (30 days), merge into single JSON array with all RoutingDecision objects, write to selected file path using Node.js fs.writeFileSync, show success message "Exported {count} routing records to {path}"
 
-- [ ] T052 [P] Implement manual quota reset command in `src/vscode/commands/routing-commands.ts`: create command 'claudeSwitcher.routing.resetQuota', prompt user for confirmation vscode.window.showWarningMessage("Reset subscription quota to 0? This will restart your rolling window.", "Reset", "Cancel"), if user clicks "Reset", call QuotaTracker.resetUsage(), reset rollingWindowStart to today, log routing decision documenting manual reset, show success message "Quota tracking reset to 0, rolling window restarted"
+- [X] T052 [P] Implement manual quota reset command in `src/vscode/commands/routing-commands.ts`: create command 'claudeSwitcher.routing.resetQuota', prompt user for confirmation vscode.window.showWarningMessage("Reset subscription quota to 0? This will restart your rolling window.", "Reset", "Cancel"), if user clicks "Reset", call QuotaTracker.resetUsage(), reset rollingWindowStart to today, log routing decision documenting manual reset, show success message "Quota tracking reset to 0, rolling window restarted"
 
-- [ ] T053 [P] Implement configure routing shortcut command in `src/vscode/commands/routing-commands.ts`: create command 'claudeSwitcher.routing.configure', call vscode.openSettings('@ext:claude-switcher claudeSwitcher.routing'), settings open filtered to routing configuration
+- [X] T053 [P] Implement configure routing shortcut command in `src/vscode/commands/routing-commands.ts`: create command 'claudeSwitcher.routing.configure', call vscode.openSettings('@ext:claude-switcher claudeSwitcher.routing'), settings open filtered to routing configuration
 
-- [ ] T054 [P] Add click handler for status bar widget to open dashboard in `src/vscode/views/quota-status-bar.ts`: status bar item command 'claudeSwitcher.routing.showQuota' already set in T025, verify clicking opens dashboard webview
+- [X] T054 [P] Add click handler for status bar widget to open dashboard in `src/vscode/views/quota-status-bar.ts`: status bar item command 'claudeSwitcher.routing.showQuota' already set in T025, verify clicking opens dashboard webview
 
-- [ ] T055 [P] Integrate all routing commands into package.json contributes.commands in `package.json`: add commands from contracts/commands.md (showQuota, resetQuota, configure, validateHarvey, exportHistory), ensure all commands registered with proper titles and categories
+- [X] T055 [P] Integrate all routing commands into package.json contributes.commands in `package.json`: add commands from contracts/commands.md (showQuota, resetQuota, configure, validateHarvey, exportHistory), ensure all commands registered with proper titles and categories
 
 - [ ] T056 Implement routing history background cleanup task in `src/core/routing/routing-history.ts`: create cleanupOldRecords() function called on extension startup, reads daily files older than 30 days using fs.readdirSync() and fs.statSync(), calculates age, deletes files >30 days old with fs.unlinkSync(), calls createMonthlyRollup() before deletion for each month being cleaned
 
