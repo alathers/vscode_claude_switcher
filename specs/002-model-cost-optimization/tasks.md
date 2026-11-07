@@ -223,7 +223,7 @@
 
 - [ ] T063 Run quickstart.md validation for all 7 scenarios: reproduce each validation scenario in quickstart.md using manual testing or automated scripts, document any issues found, fix failing scenarios, ensure all success criteria met
 
-- [ ] T064 Final constitution compliance review: rerun constitution check from plan.md Phase 1, verify all principles and gates still passing, especially Principle IV (tests included), Principle V (no new runtime dependencies, Harvey is external), Principle III (secrets only in SecretStorage)
+- [X] T064 Final constitution compliance review: rerun constitution check from plan.md Phase 1, verify all principles and gates still passing, especially Principle IV (tests included), Principle V (no new runtime dependencies, Harvey is external), Principle III (secrets only in SecretStorage)
 
 **Checkpoint**: All user stories and polish complete, feature ready for merge
 
