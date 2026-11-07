@@ -219,7 +219,7 @@
 
 - [X] T061 Code cleanup and refactoring: extract magic numbers to constants (30ms, 200ms latency, 1s transition, 5 failure threshold, 60s cooldown), add type exports to index barrel files if needed, ensure all new modules export correct types
 
-- [ ] T062 Security hardening: verify no secrets (API keys) in logs (Principle III), redact API key from error messages, validate Harvey baseUrl prevents SSRF (block non-local IPs, allow only localhost/127.0.0.1 by default), add user-configurable allow-list for Harvey hosts
+- [X] T062 Security hardening: verify no secrets (API keys) in logs (Principle III), redact API key from error messages, validate Harvey baseUrl prevents SSRF (block non-local IPs, allow only localhost/127.0.0.1 by default), add user-configurable allow-list for Harvey hosts
 
 - [ ] T063 Run quickstart.md validation for all 7 scenarios: reproduce each validation scenario in quickstart.md using manual testing or automated scripts, document any issues found, fix failing scenarios, ensure all success criteria met
 

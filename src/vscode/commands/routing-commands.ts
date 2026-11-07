@@ -9,11 +9,15 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
+import { URLValidator } from '../../utils/url-validator.js';
 
 // Constants (T061: extract magic numbers)
 const HARVEY_DEFAULT_PORT = 11434;
 const HARVEY_DEFAULT_URL = `http://localhost:${HARVEY_DEFAULT_PORT}`;
 const ROUTING_HISTORY_RETENTION_DAYS = 30;
+
+// Security: URL validator for SSRF prevention (T062)
+const urlValidator = new URLValidator();
 
 /**
  * Gets the default path for routing history records.
@@ -156,6 +160,14 @@ export function registerRoutingCommands(context: vscode.ExtensionContext): void 
         const config = vscode.workspace.getConfiguration('claudeSwitcher.routing');
         const baseUrl = config.get<string>('harvey.baseUrl', HARVEY_DEFAULT_URL);
 
+        // T062: Security hardening - validate baseUrl is localhost to prevent SSRF
+        if (!urlValidator.isLocalhost(baseUrl)) {
+          await vscode.window.showErrorMessage(
+            `Security: Harvey baseUrl must be localhost-based for security (SSRF prevention). Current baseUrl: ${baseUrl}. Please use localhost, 127.0.0.1, or ::1.`
+          );
+          return;
+        }
+
         // Try to connect to Harvey health endpoint
         const healthUrl = `${baseUrl}/health`;
         const response = await fetch(healthUrl);
@@ -166,13 +178,13 @@ export function registerRoutingCommands(context: vscode.ExtensionContext): void 
           );
         } else {
           await vscode.window.showErrorMessage(
-            `Cannot connect to Harvey: ${response.statusText}. Troubleshooting: 1. Verify Harvey running: \`harvey serve --port ${HARVEY_DEFAULT_PORT}\` 2. Check baseUrl in settings 3. Check firewall rules`
+            `Cannot connect to Harvey: ${response.statusText}. Troubleshooting: 1. Verify Harvey running: \`harvey serve --port ${HARVEY_DEFAULT_PORT}\` 2. Check baseUrl in settings 3. Check firewall rules (must be localhost-based)`
           );
         }
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         await vscode.window.showErrorMessage(
-          `Cannot connect to Harvey: ${errorMessage}. Troubleshooting: 1. Verify Harvey running: \`harvey serve --port ${HARVEY_DEFAULT_PORT}\` 2. Check baseUrl in settings 3. Check firewall rules`
+          `Cannot connect to Harvey: ${errorMessage}. Troubleshooting: 1. Verify Harvey running: \`harvey serve --port ${HARVEY_DEFAULT_PORT}\` 2. Check baseUrl in settings 3. Check firewall rules (must be localhost-based)`
         );
       }
     }
