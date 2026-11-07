@@ -245,10 +245,16 @@ export class RoutingEngine {
   }
 
   /**
-   * Updates reload progress (0-1).
+   * Constants for progress range (T061 code cleanup).
+   */
+  private static readonly PROGRESS_MIN = 0;
+  private static readonly PROGRESS_MAX = 1;
+
+  /**
+   * Updates reload progress (PROGRESS_MIN-PROGRESS_MAX).
    */
   public updateReloadProgress(progress: number): void {
-    this.reloadProgress = Math.max(0, Math.min(1, progress));
+    this.reloadProgress = Math.max(RoutingEngine.PROGRESS_MIN, Math.min(RoutingEngine.PROGRESS_MAX, progress));
   }
 
   /**
