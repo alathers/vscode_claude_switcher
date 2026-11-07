@@ -1,153 +1,187 @@
 /**
- * Pure logic logging utility
+ * src/utils/logger.ts
  *
- * Constitution requirement: MUST NOT import vscode module
- * Uses Node.js built-ins only
+ * Core Logger with Redaction
+ *
+ * Core logger with redaction support, no VS Code API imports.
  */
 
-/**
- * Log levels
- */
 export enum LogLevel {
- DEBUG = 0,
- INFO = 1,
- WARN = 2,
- ERROR = 3,
+  DEBUG = 0,
+  INFO = 1,
+  WARN = 2,
+  ERROR = 3,
 }
 
-/**
- * Log entry structure
- */
 export interface LogEntry {
- timestamp: Date;
- level: LogLevel;
- category: string;
- message: string;
- metadata?: Record<string, unknown>;
+  timestamp: Date;
+  level: LogLevel;
+  message: string;
+  context?: Record<string, unknown>;
 }
 
-/**
- * Pure logic logger interface
- * Logs are collected but not displayed directly (VS Code output channel handled by integration layer)
- */
+export interface LoggerConfig {
+  level: LogLevel;
+  output?: (entry: LogEntry) => void;
+  redaction?: {
+    patterns: string[];
+  };
+  prefix?: string;
+}
+
+const DEFAULT_SECRET_KEYWORDS = [
+  'authToken',
+  'auth_token',
+  'apiKey',
+  'api_key',
+  'secret',
+  'password',
+  'token',
+  'credential',
+];
+
 export class Logger {
- private entries: LogEntry[] = [];
- private minLevel: LogLevel;
+  private level: LogLevel;
+  private output: (entry: LogEntry) => void;
+  private redactionPatterns: string[];
+  private prefix?: string;
 
- constructor(minLevel: LogLevel = LogLevel.INFO) {
-  this.minLevel = minLevel;
- }
-
- /**
-  * Log a message at the specified level
-  */
- private log(level: LogLevel, category: string, message: string, metadata?: Record<string, unknown>): void {
-  if (level < this.minLevel) {
-   return;
+  constructor(config: LoggerConfig) {
+    this.level = config.level;
+    this.output = config.output ?? this.defaultOutput;
+    this.redactionPatterns = config.redaction?.patterns ?? DEFAULT_SECRET_KEYWORDS;
+    this.prefix = config.prefix;
   }
 
-  const entry: LogEntry = {
-   timestamp: new Date(),
-   level,
-   category,
-   message,
-   metadata,
-  };
+  public debug(message: string, context?: Record<string, unknown>): void {
+    this.log(LogLevel.DEBUG, message, context);
+  }
 
-  this.entries.push(entry);
- }
+  public info(message: string, context?: Record<string, unknown>): void {
+    this.log(LogLevel.INFO, message, context);
+  }
 
- /**
-  * Log debug message
-  */
- debug(category: string, message: string, metadata?: Record<string, unknown>): void {
-  this.log(LogLevel.DEBUG, category, message, metadata);
- }
+  public warn(message: string, context?: Record<string, unknown>): void {
+    this.log(LogLevel.WARN, message, context);
+  }
 
- /**
-  * Log info message
-  */
- info(category: string, message: string, metadata?: Record<string, unknown>): void {
-  this.log(LogLevel.INFO, category, message, metadata);
- }
+  public error(message: string, context?: Record<string, unknown>): void {
+    this.log(LogLevel.ERROR, message, context);
+  }
 
- /**
-  * Log warning message
-  */
- warn(category: string, message: string, metadata?: Record<string, unknown>): void {
-  this.log(LogLevel.WARN, category, message, metadata);
- }
+  private log(level: LogLevel, message: string, context?: Record<string, unknown>): void {
+    if (level < this.level) {
+      return;
+    }
 
- /**
-  * Log error message
-  */
- error(category: string, message: string, metadata?: Record<string, unknown>): void {
-  this.log(LogLevel.ERROR, category, message, metadata);
- }
+    const formattedMessage = this.formatMessage(message, context);
+    const entry: LogEntry = {
+      timestamp: new Date(),
+      level,
+      message: this.redactString(formattedMessage),
+      context: context ? this.redactContext(context) : undefined,
+    };
 
- /**
-  * Get all log entries
-  */
- getEntries(): LogEntry[] {
-  return [...this.entries];
- }
+    this.output(entry);
+  }
 
- /**
-  * Get entries filtered by level
-  */
- getEntriesByLevel(level: LogLevel): LogEntry[] {
-  return this.entries.filter((entry) => entry.level === level);
- }
+  private formatMessage(message: string, context?: Record<string, unknown>): string {
+    if (!context) {
+      return message;
+    }
 
- /**
-  * Get entries filtered by category
-  */
- getEntriesByCategory(category: string): LogEntry[] {
-  return this.entries.filter((entry) => entry.category === category);
- }
+    let formatted = message;
+    const matches = message.matchAll(/\{(\w+)\}/g);
 
- /**
-  * Clear all log entries
-  */
- clear(): void {
-  this.entries = [];
- }
+    for (const match of matches) {
+      const placeholder = match[0];
+      const key = match[1];
 
- /**
-  * Get entry count
-  */
- getEntryCount(): number {
-  return this.entries.length;
- }
+      if (key in context) {
+        formatted = formatted.replace(placeholder, String(context[key]));
+      }
+    }
 
- /**
-  * Set minimum log level
-  */
- setMinLevel(level: LogLevel): void {
-  this.minLevel = level;
- }
+    return formatted;
+  }
 
- /**
-  * Get current minimum log level
-  */
- getMinLevel(): LogLevel {
-  return this.minLevel;
- }
-}
+  private redactContext(context: Record<string, unknown>): Record<string, unknown> {
+    const redacted: Record<string, unknown> = {};
 
-/**
- * Format log entry as string
- */
-export function formatLogEntry(entry: LogEntry): string {
- const timestamp = entry.timestamp.toISOString();
- const level = LogLevel[entry.level].padEnd(5);
- const metadata = entry.metadata ? ` ${JSON.stringify(entry.metadata)}` : '';
- return `[${timestamp}] [${level}] [${entry.category}] ${entry.message}${metadata}`;
-}
+    for (const [key, value] of Object.entries(context)) {
+      // Check if key EXACTLY matches a redaction pattern (for key-based redaction)
+      const keyMatches = this.redactionPatterns.some((pattern) =>
+        key.toLowerCase() === pattern.toLowerCase()
+      );
 
-/**
- * Create a new logger with the specified minimum level
- */
-export function createLogger(minLevel: LogLevel = LogLevel.INFO): Logger {
- return new Logger(minLevel);
+      redacted[key] = keyMatches ? '[REDACTED]' : this.redactValue(value);
+    }
+
+    return redacted;
+  }
+
+  private redactValue(value: unknown): unknown {
+    if (value === null || value === undefined) {
+      return value;
+    }
+
+    if (typeof value === 'string') {
+      return this.redactString(value);
+    }
+
+    if (Array.isArray(value)) {
+      return value.map((v) => this.redactValue(v));
+    }
+
+    if (typeof value === 'object') {
+      // Preserve Error instances
+      if (value instanceof Error) {
+        const redactedError = new Error(value.message);
+        redactedError.name = value.name;
+        if (value.stack) {
+          redactedError.stack = this.redactString(value.stack);
+        }
+        return redactedError;
+      }
+      return this.redactContext(value as Record<string, unknown>);
+    }
+
+    return value;
+  }
+
+  private redactString(str: string): string {
+    let redacted = str;
+    // Check for exact keyword matches (word boundaries)
+    for (const keyword of this.redactionPatterns) {
+      const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`\\b${escapedKeyword}\\b`, 'i');
+      if (regex.test(redacted)) {
+        return '[REDACTED]';
+      }
+    }
+    // Also redact actual secret values (API keys, tokens)
+    const secretPatterns = [
+      /sk-ant-[a-zA-Z0-9-_]+/g,
+      /api[_-]?key["\s:]+["\']?[a-zA-Z0-9-_]+["\']?/gi,
+      /bearer["\s:]+["\']?[a-zA-Z0-9-_=./]+["\']?/gi,
+    ];
+    for (const pattern of secretPatterns) {
+      redacted = redacted.replace(pattern, '[REDACTED]');
+    }
+    return redacted;
+  }
+
+  private defaultOutput(entry: LogEntry): void {
+    // Default output to console with color coding
+    const levelStr = LogLevel[entry.level];
+    const timestamp = entry.timestamp.toISOString();
+    const prefix = this.prefix ? `[${this.prefix}]` : '';
+
+    // eslint-disable-next-line no-console
+    console.log(`${prefix} ${timestamp} [${levelStr}] ${entry.message}`, entry.context ?? '');
+  }
+
+  public dispose(): void {
+    // Clean up resources if needed
+  }
 }

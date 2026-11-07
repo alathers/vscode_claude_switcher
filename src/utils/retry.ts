@@ -1,178 +1,173 @@
 /**
- * Pure logic retry utility
+ * src/utils/retry.ts
  *
- * Constitution requirement: MUST NOT import vscode module
- * Pure logic utilities only
+ * Retry Logic
+ *
+ * Retry logic for endpoint checks, no VS Code API imports.
  */
 
-/**
- * Retry configuration
- */
 export interface RetryConfig {
- /**
-  * Maximum number of retry attempts
-  */
- maxAttempts: number;
- /**
-  * Initial delay in milliseconds (exponentially grows)
-  */
- initialDelay: number;
- /**
-  * Multiplier for exponential backoff (e.g., 2 doubles each time)
-  */
- multiplier: number;
- /**
-  * Maximum delay cap in milliseconds
-  */
- maxDelay: number;
- /**
-  * Jitter randomness factor (0-1) to avoid thundering herd
-  * 0 = no jitter, 0.5 = 50% random variation
-  */
- jitterFactor: number;
- /**
-  * Whether to retry on specific error types
-  * Returns true if error is retryable
-  */
- shouldRetry?: (error: unknown) => boolean;
+  maxAttempts: number;
+  initialDelay: number;
+  maxDelay?: number;
+  backoffFactor?: number;
+  timeoutMs?: number;
+  jitter?: boolean;
+  shouldRetry?: (error: unknown) => boolean;
+  onRetry?: (info: { attemptNumber: number; error: Error; delay: number }) => void;
+  onComplete?: (result: RetryResult<unknown>) => void;
 }
 
-/**
- * Default retry configuration
- */
-export const DEFAULT_RETRY_CONFIG: RetryConfig = {
- maxAttempts: 3,
- initialDelay: 1000,
- multiplier: 2,
- maxDelay: 10000,
- jitterFactor: 0.1,
-};
-
-/**
- * Retry error with attempt count
- */
-export class RetryError extends Error {
- constructor(
-  message: string,
-  public readonly lastError: unknown,
-  public readonly attempt: number,
- ) {
-  super(message);
-  this.name = 'RetryError';
- }
+export interface RetryResult<T> {
+  success: boolean;
+  value?: T;
+  error?: Error;
+  attempts: number;
 }
 
-/**
- * Calculate delay with exponential backoff and jitter
- */
-function calculateDelay(attempt: number, config: RetryConfig): number {
- const exponentialDelay = config.initialDelay * Math.pow(config.multiplier, attempt - 1);
- const cappedDelay = Math.min(exponentialDelay, config.maxDelay);
+type AsyncResult<T> = RetryResult<T>;
 
- // Add jitter: delay ± jitterFactor * delay
- const jitter = cappedDelay * config.jitterFactor * (Math.random() * 2 - 1);
- return Math.max(0, Math.floor(cappedDelay + jitter));
-}
+function calculateDelay(
+  attempt: number,
+  initialDelay: number,
+  config: RetryConfig
+): number {
+  const backoffFactor = config.backoffFactor ?? 2;
+  const maxDelay = config.maxDelay ?? 30000;
+  let delay = initialDelay * Math.pow(backoffFactor, attempt - 1);
+  delay = Math.min(delay, maxDelay);
 
-/**
- * Sleep for specified milliseconds (pure logic simulation)
- * In real implementation, this would use setTimeout, but for pure logic we simulate timing
- */
-export async function sleep(ms: number): Promise<void> {
- await new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/**
- * Execute function with retry logic
- *
- * @param fn - Async function to execute
- * @param config - Retry configuration
- * @returns Result of successful execution
- * @throws RetryError if all attempts fail
- */
-export async function retry<T>(
- fn: () => Promise<T>,
- config: Partial<RetryConfig> = {},
-): Promise<T> {
- const finalConfig = { ...DEFAULT_RETRY_CONFIG, ...config };
- let lastError: unknown;
-
- for (let attempt = 1; attempt <= finalConfig.maxAttempts; attempt++) {
-  try {
-   return await fn();
-  } catch (error) {
-   lastError = error;
-   const isRetryable = finalConfig.shouldRetry ? finalConfig.shouldRetry(error) : true;
-
-   if (attempt === finalConfig.maxAttempts || !isRetryable) {
-    throw new RetryError(
-     `Failed after ${attempt} attempt${attempt > 1 ? 's' : ''}`,
-     lastError,
-     attempt,
-    );
-   }
-
-   const delay = calculateDelay(attempt, finalConfig);
-   await sleep(delay);
+  // Add jitter if enabled
+  if (config.jitter) {
+    const jitterAmount = delay * 0.1; // 10% jitter
+    delay = delay - jitterAmount / 2 + Math.random() * jitterAmount;
   }
- }
 
- throw new RetryError(
-  `Failed after ${finalConfig.maxAttempts} attempts`,
-  lastError,
-  finalConfig.maxAttempts,
- );
+  return delay;
 }
 
-/**
- * Execute function with retry for specific error conditions
- *
- * @param fn - Async function to execute
- * @param isErrorRetryable - Predicate to check if error is retryable
- * @param config - Retry configuration
- * @returns Result of successful execution
- * @throws RetryError if all attempts fail
- */
-export async function retryOnError<T>(
- fn: () => Promise<T>,
- isErrorRetryable: (error: unknown) => boolean,
- config: Partial<RetryConfig> = {},
-): Promise<T> {
- return retry(fn, { ...config, shouldRetry: isErrorRetryable });
-}
+export class RetryUtils {
+  /**
+   * Executes an async operation with retry logic.
+   *
+   * @param operation - Async function to execute
+   * @param config - Retry configuration
+   * @returns Result of the operation
+   */
+  public static async retry<T>(
+    operation: () => Promise<T>,
+    config: RetryConfig
+  ): Promise<AsyncResult<T>> {
+    let lastError: Error | undefined;
+    let actualAttempts = 0;
+    // Reserved for future duration tracking
+    const startTime = Date.now();
+    void startTime; // Suppress unused warning
 
-/**
- * Execute function with retry for network-related errors
- */
-export async function retryNetwork<T>(
- fn: () => Promise<T>,
- config: Partial<RetryConfig> = {},
-): Promise<T> {
- return retryOnError(fn, (error): boolean => {
-  if (error instanceof Error) {
-   // Retry on network-related errors
-   const retryablePatterns = [
-    'ECONNRESET',
-    'ETIMEDOUT',
-    'ECONNREFUSED',
-    'ENOTFOUND',
-    'ENETUNREACH',
-    'fetch failed',
-    'NetworkError',
-    'timeout',
-   ];
-   return retryablePatterns.some((pattern) => error.name.includes(pattern) || error.message.includes(pattern));
+
+
+    for (let attempt = 1; attempt <= config.maxAttempts; attempt++) {
+      actualAttempts = attempt;
+      try {
+        let resultPromise = operation();
+
+        // Apply timeout if configured
+        if (config.timeoutMs) {
+          resultPromise = Promise.race([
+            resultPromise,
+            new Promise<T>((_, reject) =>
+              setTimeout(() => reject(new Error('Operation timeout')), config.timeoutMs)
+            ),
+          ]) as Promise<T>;
+        }
+
+        const value = await resultPromise;
+
+        const result: AsyncResult<T> = {
+          success: true,
+          value,
+          attempts: attempt,
+        };
+
+        config.onComplete?.(result);
+        return result;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+
+        // Check if we should retry
+        if (
+          config.shouldRetry &&
+          !config.shouldRetry(lastError)
+        ) {
+          break;
+        }
+
+        // Don't retry after last attempt
+        if (attempt >= config.maxAttempts) {
+          break;
+        }
+
+        // Calculate delay and wait
+        const delay = calculateDelay(attempt, config.initialDelay, config);
+
+        config.onRetry?.({
+          attemptNumber: attempt,
+          error: lastError,
+          delay,
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+
+    const failureResult: AsyncResult<T> = {
+      success: false,
+      error: lastError,
+      attempts: actualAttempts,
+    };
+
+    config.onComplete?.(failureResult);
+    return failureResult;
   }
-  return false;
- }, config);
-}
 
-/**
- * Create a retryable function wrapper
- */
-export function createRetryable<T extends (...args: unknown[]) => Promise<unknown>>(
- fn: T,
- config: Partial<RetryConfig> = {},
-): T {
- return (async (...args: unknown[]) => retry(() => fn(...args), config)) as T;
+  /**
+   * Creates a default retry configuration.
+   */
+  public static createDefaultConfig(overrides?: Partial<RetryConfig>): RetryConfig {
+    return {
+      maxAttempts: 3,
+      initialDelay: 1000,
+      backoffFactor: 2,
+      maxDelay: 30000,
+      jitter: true,
+      shouldRetry: (error) => {
+        const msg = error instanceof Error ? error.message : String(error);
+        return !msg.includes('ETIMEDOUT'); // Don't retry timeouts
+      },
+      ...overrides,
+    };
+  }
+
+  /**
+   * Creates a no-retry configuration (single attempt, no delay).
+   */
+  public static createNoRetryConfig(): RetryConfig {
+    return {
+      maxAttempts: 1,
+      initialDelay: 0,
+    };
+  }
+
+  /**
+   * Creates an aggressive retry configuration (many attempts, short delays).
+   */
+  public static createAggressiveConfig(): RetryConfig {
+    return {
+      maxAttempts: 5,
+      initialDelay: 200,
+      backoffFactor: 1.5,
+      maxDelay: 5000,
+      jitter: true,
+    };
+  }
 }

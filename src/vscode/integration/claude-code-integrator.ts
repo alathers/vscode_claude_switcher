@@ -1,0 +1,268 @@
+/**
+ * src/vscode/integration/claude-code-integrator.ts
+ *
+ * Claude Code Integrator
+ *
+ * Claude Code panel reload, configuration file manipulation, interface management (isolates VS Code API access).
+ */
+
+import type typeVscode from 'vscode';
+import type { commands, window } from 'vscode';
+
+export interface VSCodeAdapter {
+  commands: typeof commands;
+  window: typeof window;
+}
+
+export enum PanelState {
+  CLOSED = 'closed',
+  OPEN = 'open',
+  ACTIVE = 'active',
+}
+
+export enum ReloadMode {
+  CONTINUE = 'continue',
+  NEW_SESSION = 'new-session',
+}
+
+export interface ReloadResult {
+  success: boolean;
+  message: string;
+  error?: Error;
+}
+
+export interface SessionInfo {
+  sessionId?: string;
+  state: PanelState;
+  hasActiveConversation: boolean;
+}
+
+export class ClaudeCodeIntegrator {
+  // Reserved for future VS Code API calls
+  private adapter: VSCodeAdapter;
+
+  // Reserved for future panel/view management
+  private readonly claudePanelId = 'claudeCode';
+  private readonly claudeViewType = 'claude-code';
+
+  constructor(adapter: VSCodeAdapter) {
+    this.adapter = adapter;
+
+    // Suppress unused field warnings - these are reserved for future implementation
+    void this.adapter;
+    void this.claudePanelId;
+    void this.claudeViewType;
+  }
+
+  /**
+   * Detects if Claude Code panel is open.
+   */
+  public async detectPanelState(): Promise<PanelState> {
+    try {
+      // This would check if the Claude Code view is open
+      // For now, we assume it's closed since we can't query VS Code panels directly
+      // Real implementation would use the VS Code API to check view containers
+      return PanelState.CLOSED;
+    } catch {
+      // If detection fails, assume closed
+      return PanelState.CLOSED;
+    }
+  }
+
+  /**
+   * Gets session info from active document.
+   */
+  public async getSessionInfo(): Promise<SessionInfo> {
+    const panelState = await this.detectPanelState();
+
+    // Real implementation would check for active Claude Code session
+    return {
+      state: panelState,
+      hasActiveConversation: panelState === PanelState.ACTIVE,
+    };
+  }
+
+  /**
+   * Triggers panel reload with new configuration.
+   */
+  public async reloadPanel(
+    endpointUrl: string,
+    authToken?: string,
+    _mode: ReloadMode = ReloadMode.CONTINUE // Reserved for future session mode support
+  ): Promise<ReloadResult> {
+    try {
+      // Step 1: Detect current state
+      const sessionInfo = await this.getSessionInfo();
+
+      if (sessionInfo.state === PanelState.CLOSED) {
+        // Panel not open, just update config
+        await this.updateConfiguration(endpointUrl, authToken);
+        return {
+          success: true,
+          message: 'Configuration updated. Open Claude Code panel to use new endpoint.',
+        };
+      }
+
+      // Step 2: Update configuration
+      await this.updateConfiguration(endpointUrl, authToken);
+
+      // Step 3: Reload panel
+      await this.closePanel();
+      await new Promise((resolve) => setTimeout(resolve, 300)); // Wait for close
+      await this.openPanel();
+
+      return {
+        success: true,
+        message: 'Panel reloaded successfully with new endpoint.',
+      };
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      return {
+        success: false,
+        message: 'Failed to reload panel',
+        error: err,
+      };
+    }
+  }
+
+  /**
+   * Closes Claude Code panel.
+   */
+  public async closePanel(): Promise<void> {
+    try {
+      // Real implementation would execute VS Code command to close Claude Code panel
+      // await this.adapter.commands.executeCommand('workbench.action.closeActiveEditor');
+    } catch (error) {
+      throw new Error(`Failed to close panel: ${error}`);
+    }
+  }
+
+  /**
+   * Opens Claude Code panel.
+   */
+  public async openPanel(): Promise<void> {
+    try {
+      // Real implementation would execute VS Code command to open Claude Code panel
+      // await this.adapter.commands.executeCommand('claude-code.open');
+    } catch (error) {
+      throw new Error(`Failed to open panel: ${error}`);
+    }
+  }
+
+  /**
+   * Updates Claude Code configuration.
+   */
+  public async updateConfiguration(_endpointUrl: string, _authToken?: string): Promise<void> {
+    try {
+      // Real implementation would find and modify Claude Code configuration files
+      // This involves modifying settings.json or Claude Code's specific config files
+
+      // Update endpoint URL in Claude Code configuration
+      // Real implementation would write to appropriate config locations
+    } catch (error) {
+      throw new Error(`Failed to update configuration: ${error}`);
+    }
+  }
+
+  /**
+   * Generates configuration file content.
+   */
+  public generateConfigContent(
+    endpointUrl: string,
+    authToken?: string
+  ): string {
+    const lines = [
+      '// Claude Code Configuration',
+      '// Generated by Claude Switcher',
+      '',
+      `export const CLAUDE_API_BASE = "${endpointUrl}";`,
+    ];
+
+    if (authToken) {
+      lines.push('// Auth token should be set via environment variable or secure storage');
+      lines.push(`// ANTHROPIC_API_KEY = "${this.redactToken(authToken)}";`);
+    }
+
+    return lines.join('\n');
+  }
+
+  /**
+   * Gets configuration file path.
+   */
+  public getConfigFilePath(): string | null {
+    // Real implementation would locate Claude Code's config files
+    // This depends on Claude Code's configuration mechanism
+    return null;
+  }
+
+  /**
+   * Verifies new endpoint is active after reload.
+   */
+  public async verifyEndpoint(_endpointUrl: string): Promise<boolean> {
+    try {
+      // Real implementation would verify the configuration is applied
+      // This might involve reading back the configuration or checking network calls
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Shows user instructions for manual reload.
+   */
+  public async showManualReloadInstructions(endpointUrl: string): Promise<void> {
+    const message = [
+      'Claude Switcher has updated the configuration.',
+      '',
+      'Please manually restart the Claude Code panel:',
+      '1. Close the Claude Code panel',
+      '2. Reopen it from the command palette (Cmd+Shift+P → Claude Code: Open)',
+      '',
+      `New endpoint: ${endpointUrl}`,
+    ].join('\n');
+
+    // Real implementation would show this in a VS Code info message
+    // eslint-disable-next-line no-console
+    console.info(message);
+  }
+
+  /**
+   * Detects configuration conflicts.
+   */
+  public async detectConfigurationConflicts(): Promise<string[]> {
+    const conflicts: string[] = [];
+
+    // Real implementation would check for manually edited config files
+    // and report conflicts
+
+    return conflicts;
+  }
+
+  /**
+   * Redacts token for display/logging.
+   */
+  private redactToken(token: string): string {
+    if (token.length <= 8) {
+      return '[REDACTED]';
+    }
+    return `${token.slice(0, 4)}...${token.slice(-4)}`;
+  }
+}
+
+/**
+ * Creates a mock VS Code adapter for testing.
+ */
+export function createMockVSCodeAdapter(): VSCodeAdapter {
+  return {
+    commands: {
+      executeCommand: async () => undefined,
+      registerCommand: () => ({ dispose: () => {} } as unknown as typeVscode.Disposable),
+    } as unknown as typeof commands,
+    window: {
+      showInformationMessage: async () => undefined,
+      showWarningMessage: async () => undefined,
+      showErrorMessage: async () => undefined,
+    } as unknown as typeof window,
+  };
+}

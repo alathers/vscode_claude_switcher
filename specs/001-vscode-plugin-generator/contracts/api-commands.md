@@ -1,8 +1,8 @@
 # API Commands Contract
 
-**Project**: VS Code Model Profile Orchestrator
+**Project**: VS Code Claude Model Rotator
 **Version**: 1.0
-**Date**: 2026-10-17
+**Date**: 2026-11-06
 **Purpose**: Interface contract for all VS Code extension commands
 
 ## Overview
@@ -10,17 +10,16 @@
 This contract defines the schema for all VS Code extension commands, including input parameters, output responses, and error handling. The extension registers these commands through `package.json` `contributes.commands` and implements them in `src/vscode/commands/`.
 
 Commands are categorized by functional area:
-- Profile commands
-- Handoff commands
-- Policy commands
-- Validation commands
-- UI commands
+- Endpoint commands
+- Routing commands
+- Status commands
+- Export/import commands
 
 ## Command Conventions
 
 All commands follow these conventions:
 
-1. **Command IDs**: Prefixed with `claudeSwitcher.` (e.g., `claudeSwitcher.selectProfile`)
+1. **Command IDs**: Prefixed with `claudeSwitcher.` (e.g., `claudeSwitcher.addEndpoint`)
 2. **Error Handling**: All commands throw errors with standardized codes and messages
 3. **Progress Reporting**: Long-running commands provide progress notifications
 4. **Confirmation**: Destructive operations require user confirmation dialogs
@@ -41,736 +40,427 @@ Common error codes:
 
 | Code | Meaning | Retryable |
 |------|---------|-----------|
-| `PROFILE_NOT_FOUND` | Profile does not exist | No |
-| `PROFILE_INVALID` | Profile validation failed | No |
-| `SECRET_MISSING` | Credential secret not found in SecretStorage | No |
+| `ENDPOINT_INVALID_URL` | Endpoint URL is invalid | No |
+| `ENDPOINT_NOT_FOUND` | Endpoint does not exist | No |
+| `ENDPOINT_IN_USE` | Endpoint is currently active | No |
+| `NO_ENDPOINTS_CONFIGURED` | No endpoints have been configured | No |
+| `AUTH_TOKEN_MISSING` | Auth token not found in SecretStorage | No |
 | `NETWORK_ERROR` | Network/endpoint unreachable | Yes |
-| `TIMEOUT` | Operation exceeded timeout | Yes |
-| `PERMISSION_DENIED` | User lacks permission | No |
-| `CONFLICT` | Operation conflicts with another session | N/A |
-| `UNSUPPORTED_OPERATION` | Capability not supported by adapter | No |
-| `CANCELLED` | User cancelled operation | No |
+| `UNREACHABLE` | Endpoint is unreachable | Yes |
+| `PANEL_RELOAD_FAILED` | Claude Code panel reload failed | Yes |
+| `NO_ACTIVE_PANEL` | No Claude Code panel is open | No |
+| `NO_ACTIVE_ENDPOINT` | No endpoint is set as active | No |
+| `RELOAD_FAILED` | Panel reload operation failed | Yes |
 | `UNKNOWN` | Unexpected error | Maybe |
 
 ---
 
-## Profile Commands
+## Endpoint Commands
 
-### Select Profile (Workspace Default)
+### Add Endpoint
 
-**Command ID**: `claudeSwitcher.selectProfile`
+**Command ID**: `claudeSwitcher.addEndpoint`
 
-**Purpose**: Select or change the workspace default profile
+**Purpose**: Add a new Claude API endpoint configuration
 
 ```typescript
-interface SelectProfileArgs {
-  profileId: string | null;  // null = no default profile
+interface AddEndpointArgs {
+  url: string;
+  authToken?: string;  // Optional - for endpoints requiring auth
+  label?: string;     // Optional - display label, defaults to URL
+  models: {
+    name: string;     // Canonical model name (e.g., "claude-sonnet-5-5")
+    alias?: string;   // Optional display alias (e.g., "Sonnet 5.5")
+  }[];                // One or more models available at this endpoint
 }
 
-interface SelectProfileResult {
+interface AddEndpointResult {
   success: boolean;
   message: string;
-  profile: {
-    id: string;
+  endpoint: {
+    id: string;  // Auto-generated unique ID
+    url: string;
     label: string;
-    adapter: string;
-    model: string;
-    network: {
-      providerClass: 'local' | 'private-network' | 'cloud';
-    };
-  } | null;
+    hasAuth: boolean;
+    status: 'untested' | 'connected' | 'unreachable';
+    models: {
+      name: string;
+      alias?: string;
+    }[];
+  };
 }
 ```
 
 **Behavior**:
-1. Validate profile exists
-2. Check secret references (if required)
-3. Validate profile against workspace policy (allowedTemplateIds)
-4. Run non-billable preflight validation
-5. Set workspace profile (persistent across VS Code restarts)
-6. Update status bar indicator
-7. Log audit event (profile-selected)
+1. Validate URL format
+2. If authToken provided, store securely in SecretStorage
+3. Generate unique endpoint ID
+4. Create endpoint configuration
+5. Perform initial connectivity check
+6. Update status bar if this is the first endpoint
 
 **Errors**:
-- `PROFILE_NOT_FOUND`: Profile id not in available profiles
-- `PROFILE_INVALID`: Profile validation failed
-- `SECRET_MISSING`: Secret reference not found in SecretStorage
-- `POLICY_VIOLATION`: Profile not in allowedTemplateIds
+- `ENDPOINT_INVALID_URL`: URL is malformed or not a valid HTTP/HTTPS URL
+- `NETWORK_ERROR`: Initial connectivity check failed (non-blocking)
 
 ---
 
-### Select Profile (Per-Conversation Override)
+### Edit Endpoint
 
-**Command ID**: `claudeSwitcher.selectProfileOverride`
+**Command ID**: `claudeSwitcher.editEndpoint`
 
-**Purpose**: Select profile for current conversation only (temporary override
+**Purpose**: Edit an existing endpoint configuration
 
 ```typescript
-interface SelectProfileOverrideArgs {
-  profileId: string;
-  sessionId?: string;  // Optional: specific session
+interface EditEndpointArgs {
+  endpointId: string;
+  url?: string;
+  authToken?: string;
+  label?: string;
+  models?: {
+    name: string;
+    alias?: string;
+  }[];
 }
 
-interface SelectProfileOverrideResult {
+interface EditEndpointResult {
   success: boolean;
   message: string;
-  override: {
-    profileId: string;
-    sessionId: string;
-    until?: Date;  // Temporary override expiration (optional)
+  endpoint: {
+    id: string;
+    url: string;
+    label: string;
+    hasAuth: boolean;
+    status: 'untested' | 'connected' | 'unreachable';
+    models: {
+      name: string;
+      alias?: string;
+    }[];
   };
 }
 ```
 
 **Behavior**:
-1. Validate profile exists
-2. Check secret references
-3. Validate against policy
-4. Apply override to specified session (or current active session)
-5. Log audit event (profile-selected with override flag)
-
----
-
-### Create Profile
-
-**Command ID**: `claudeSwitcher.createProfile`
-
-**Purpose**: Create a new user profile or use a template
-
-```typescript
-interface CreateProfileArgs {
-  templateId?: string | null;  // Optional: start from template
-  profile: {
-    id: string;
-    label: string;
-    adapter: AdapterType;
-    // ... (partial profile config; validation fills defaults)
-  };
-}
-
-interface CreateProfileResult {
-  success: boolean;
-  message: string;
-  profile: {
-    id: string;
-    label: string;
-    validation?: ValidationResult;
-  };
-}
-```
-
-**Behavior**:
-1. If templateId provided, load template as starting point
-2. Validate profile structure per schema
-3. Validate secret references (if provided)
-4. Store profile in `~/.claude-claude-switcher/profiles/<id>.yaml`
-5. Log audit event (profile-created)
+1. Validate endpoint exists
+2. Update provided fields (merge semantics)
+3. If authToken updated, replace old secret in SecretStorage
+4. If URL updated, perform new connectivity check
+5. Update active endpoint if this endpoint is currently active
 
 **Errors**:
-- `PROFILE_ID_EXISTS`: Profile with this id already exists
-- `TEMPLATE_NOT_FOUND`: Template id not found
-- `PROFILE_INVALID`: Profile validation failed
+- `ENDPOINT_NOT_FOUND`: Endpoint id not found
+- `ENDPOINT_INVALID_URL`: URL is malformed
 
 ---
 
-### Edit Profile
+### Remove Endpoint
 
-**Command ID**: `claudeSwitcher.editProfile`
+**Command ID**: `claudeSwitcher.removeEndpoint`
 
-**Purpose**: Edit an existing user profile
-
-```typescript
-interface EditProfileArgs {
-  profileId: string;
-  changes: Partial<ProfileConfig>;  // Fields to update (merge semantics)
-}
-
-interface EditProfileResult {
-  success: boolean;
-  message: string;
-  profile: {
-    id: string;
-    label: string;
-    updatedFields: string[];
-    validation?: ValidationResult;
-  };
-}
-```
-
-**Behavior**:
-1. Load existing profile
-2. Merge changes (override provided fields)
-3. Validate updated profile
-4. Write to file (atomic write-to-temp-then-rename)
-5. Keep backup of previous config
-6. Log audit event (profile-updated)
-
-**Errors**:
-- `PROFILE_NOT_FOUND`: Profile id not found
-- `PROFILE_INVALID`: Updated profile validation failed
-- `SECRET_MISSING`: Secret reference not found
-
----
-
-### Delete Profile
-
-**Command ID**: `claudeSwitcher.deleteProfile`
-
-**Purpose**: Delete a user profile
+**Purpose**: Remove an endpoint configuration
 
 ```typescript
-interface DeleteProfileArgs {
-  profileId: string;
+interface RemoveEndpointArgs {
+  endpointId: string;
   confirm: boolean;  // User confirmed deletion in dialog
 }
 
-interface DeleteProfileResult {
+interface RemoveEndpointResult {
   success: boolean;
   message: string;
-  deleted: {
-    profileId: string;
-    backupPath: string;  // Path to backup file
+  removed: {
+    endpointId: string;
+    label: string;
+    url: string;
   };
 }
 ```
 
 **Behavior**:
 1. Require user confirmation (via prompt dialog before command invocation)
-2. Move profile to backup location (`backups/<id>-<timestamp>.yaml`)
-3. If profile was workspace default, clear default
-4. If profile was active in sessions, deactivate those sessions
-5. Log audit event (profile-deleted)
+2. Delete endpoint from configuration
+3. Delete auth token from SecretStorage if present
+4. If this endpoint was active, select another endpoint or mark none active
+5. Update status bar
 
 **Errors**:
-- `PROFILE_NOT_FOUND`: Profile id not found
-- `PROFILE_IN_USE`: Profile is currently active in sessions
+- `ENDPOINT_NOT_FOUND`: Endpoint id not found
+- `ENDPOINT_IN_USE`: Cannot remove the only active endpoint (if others exist, must select another first)
 
 ---
 
-### Duplicate Profile
+## Routing Commands
 
-**Command ID**: `claudeSwitcher.duplicateProfile`
+### Select Active Endpoint
 
-**Purpose**: Create a copy of an existing profile
+**Command ID**: `claudeSwitcher.selectActiveEndpoint`
+
+**Purpose**: Select which endpoint should receive Claude API calls with panel reload
 
 ```typescript
-interface DuplicateProfileArgs {
-  sourceProfileId: string;
-  newProfileId: string;
-  newLabel: string;
-  copySecrets: boolean;  // Whether to copy secret references
+interface SelectActiveEndpointArgs {
+  endpointId: string;
 }
 
-interface DuplicateProfileResult {
+interface SelectActiveEndpointResult {
   success: boolean;
   message: string;
-  profile: {
+  endpoint: {
     id: string;
     label: string;
-    sourceProfileId: string;
+    url: string;
+    status: 'untested' | 'connected' | 'unreachable';
+    models: {
+      name: string;
+      alias?: string;
+    }[];
   };
+  reloaded: boolean;  // Whether panel was reloaded
 }
 ```
 
 **Behavior**:
-1. Validate source profile exists
-2. Copy all fields to new profile
-3. If not copySecrets, clear credential.secretRef
-4. Store new profile
-5. Log audit event (profile-duplicated)
+1. Validate endpoint exists
+2. Check if Claude Code panel is active with an ongoing session
+3. If active session exists, prompt user with options: (1) reload panel with new endpoint (continue session), (2) keep current session unchanged, (3) start new session with new endpoint
+4. Set as active endpoint (persistent across VS Code restarts)
+5. Update status bar indicator
+6. Route all Claude API calls to this endpoint
+7. If user chose to reload, restart the Claude Code panel with new endpoint configuration
 
 **Errors**:
-- `PROFILE_NOT_FOUND`: Source profile not found
-- `PROFILE_ID_EXISTS`: New profile id already exists
+- `ENDPOINT_NOT_FOUND`: Endpoint id not found
+- `PANEL_RELOAD_FAILED`: Failed to reload Claude Code panel with new endpoint
+- `NO_ACTIVE_ENDPOINT`: No endpoint is configured as active
+- `NO_ACTIVE_PANEL`: No Claude Code panel is currently open
 
 ---
 
-## Handoff Commands
+### Reload Claude Code Panel
 
-### Switch Profile (with Handoff)
+**Command ID**: `claudeSwitcher.reloadPanel`
 
-**Command ID**: `claudeSwitcher.switchProfile`
-
-**Purpose**: Switch current session to different profile with handoff options
+**Purpose**: Manually reload the Claude Code panel with the current active endpoint
 
 ```typescript
-interface SwitchProfileArgs {
-  sourceProfileId: string;
-  destinationProfileId: string;
-  sessionId: string;
-  handoffMode: 'full' | 'summary' | 'none';
-  summaryOptions?: {
-    includeCode: boolean;
-    includeSensitiveData: boolean;
-    includeToolOutput: boolean;
-    includeDiffs: boolean;
-    includeCommandOutput: boolean;
-    includePaths: boolean;
-  };
-  userApproval: boolean;  // User approved this handoff
+interface ReloadPanelArgs {
+  sessionId?: string;  // Optional: specific session
+  mode: 'continue' | 'new-session';  // Continue current session or start fresh
 }
 
-interface SwitchProfileResult {
+interface ReloadPanelResult {
   success: boolean;
   message: string;
-  handoff: {
-    handoffId: string;
-    sourceProfileId: string;
-    destinationProfileId: string;
-    mode: 'full' | 'summary' | 'none';
-    summaryFields?: typeof summaryOptions;
-    timestamp: Date;
-  };
-  newSession?: {
-    sessionId: string;  // If new session created
-    status: 'initializing' | 'active';
-  };
-}
-```
-
-**Behavior**:
-1. Validate both source and destination profiles
-2. Check compatibility of handoff mode with capabilities
-3. For mode=full:
-   - Call getTranscript on source adapter (if supported)
-   - Validate transcript retrieved successfully
-4. For mode=summary:
-   - Generate summary using local summarizer or source-model (if opt-in)
-   - Apply redaction based on summaryOptions
-5. For mode=none: No context transfer
-6. Inactivate source session
-7. Create or activate destination session with handoff context
-8. Store handoff metadata (excluding transcript/summary content)
-9. Log audit events (handoff-initiated, handoff-completed)
-
-**Errors**:
-- `PROFILE_NOT_FOUND`: Source or destination profile not found
-- `CAPABILITY_NOT_SUPPORTED`: full transcript handoff not supported by source adapter
-- `SUMMARY_GENERATION_FAILED`: Failed to generate summary
-- `NETWORK_ERROR`: Destination provider unreachable
-- `CANCELLED`: User cancelled mid-handoff
-
-**UI Flow**:
-1. User invokes command (via status bar, command palette, or activity ledger)
-2. Extension shows handoff mode selection dialog
-3. Extension recommends mode based on trust-zone combination
-4. User selects mode; for summary mode, shows field inclusion options
-5. User confirms
-6. Handoff executes with progress indicator
-
----
-
-### Export Handoff Package
-
-**Command ID**: `claudeSwitcher.exportHandoffPackage`
-
-**Purpose**: Manually export a sanitized handoff package for user-mediated transfer
-
-```typescript
-interface ExportHandoffPackageArgs {
-  sourceSessionId: string;
-  destinationProfileId: string;
-  includeTranscript: boolean;  // If supported
-  summaryOptions?: typeof summaryOptions;
-  outputPath?: string;  // Optional: user-provided path
-  approved: boolean;
-}
-
-interface ExportHandoffPackageResult {
-  success: boolean;
-  message: string;
-  package: {
-    id: string;
-    type: 'transcript' | 'summary' | 'empty';
-    filePath: string;  // Where package was saved
-    sizeBytes: number;
-    expires?: Date;  // If configured retention applies
-  };
-}
-```
-
-**Behavior**:
-1. Generate handoff content (transcript or summary) with redaction
-2. Create package JSON containing metadata + content
-3. Save to `~/.claude-claude-switcher/exports/<id>.json` or user-provided path
-4. Log audit event (handoff-exported)
-
-**Errors**:
-- `SESSION_NOT_FOUND`: Source session not found
-- `CAPABILITY_NOT_SUPPORTED`: Transcript export not supported
-
----
-
-### Delete Handoff Metadata
-
-**Command ID**: `claudeSwitcher.deleteHandoffMetadata`
-
-**Purpose**: Delete handoff metadata and optionally content from local storage
-
-```typescript
-interface DeleteHandoffMetadataArgs {
-  handoffId: string;
-  confirmed: boolean;  // User confirmed deletion
-}
-
-interface DeleteHandoffMetadataResult {
-  success: boolean;
-  message: string;
-  deleted: {
-    handoffId: string;
-    deletedFiles: string[];
-  };
-}
-```
-
-**Behavior**:
-1. Require user confirmation
-2. Delete handoff metadata file
-3. Delete any associated content files
-4. Log audit event (handoff-deleted)
-
----
-
-## Policy Commands
-
-### Set Privacy Mode
-
-**Command ID**: `claudeSwitcher.setPrivacyMode`
-
-**Purpose**: Change workspace privacy mode (unrestricted/guarded/strict
-
-```typescript
-interface SetPrivacyModeArgs {
-  mode: 'unrestricted' | 'guarded' | 'strict';
-  reason?: string;  // Optional: user-provided reason
-  revertAfterMinutes?: number | null;  // Optional: auto-revert timeout
-  requireSecondApprover?: boolean;  // Optional: get second approval
-}
-
-interface SetPrivacyModeResult {
-  success: boolean;
-  message: string;
-  policy: {
-    previousMode: 'unrestricted' | 'guarded' | 'strict';
-    newMode: 'unrestricted' | 'guarded' | 'strict';
-    reason?: string;
-    revertAt?: Date;
-  };
-}
-```
-
-**Behavior**:
-1. Validate mode change respects workspace policy configuration (requireConfirmation, requireReason, etc.)
-2. If requireReason and not provided, prompt user for reason
-3. If revertAfterMinutes, schedule auto-revert
-4. If requireSecondApprover, trigger second approval workflow
-5. Update workspace policy file
-6. Log audit event (policy-changed)
-
-**Errors**:
-- `REQUIRES_CONFIRMATION`: User must confirm mode change
-- `REQUIRES_REASON`: User must provide reason
-- `REQUIRES_APPROVAL`: Second approver must approve
-- `POLICY_INVALID`: Updated policy validation fails
-
-### Approve Cloud Request
-
-**Command ID**: `claudeSwitcher.approveCloudRequest`
-
-**Purpose**: Approve a pending cloud model request in guarded mode
-
-```typescript
-interface ApproveCloudRequestArgs {
-  requestId: string;
-  destination: string;  // Cloud provider/model
-  reason?: string;
-}
-
-interface ApproveCloudRequestResult {
-  success: boolean;
-  message: string;
-  approved: {
-    requestId: string;
-    destination: string;
-    approvedAt: Date;
-  };
-}
-```
-
-**Behavior**:
-1. Verify request is pending
-2. Record approval with metadata
-3. Allow request to proceed
-4. Log audit event
-
----
-
-### Deny Cloud Request
-
-**Command ID**: `claudeSwitcher.denyCloudRequest`
-
-**Purpose**: Deny a pending cloud model request
-
-```typescript
-interface DenyCloudRequestArgs {
-  requestId: string;
-  reason?: string;
-}
-
-interface DenyCloudRequestResult {
-  success: boolean;
-  message: string;
-  denied: {
-    requestId: string;
-    deniedAt: Date;
-  };
-}
-```
-
-**Behavior**:
-1. Verify request is pending
-2. Record denial with reason
-3. Block request
-4. Log audit event
-
----
-
-## Validation Commands
-
-### Validate Profile
-
-**Command ID**: `claudeSwitcher.validateProfile`
-
-**Purpose**: Run validation on a profile (schema, policy, secrets, endpoint)
-
-```typescript
-interface ValidateProfileArgs {
-  profileId: string;
-  deepValidation?: boolean;  // Optional: attempt billable model calls
-  approved?: boolean;  // Required if deepValidation=true
-}
-
-interface ValidateProfileResult {
-  success: boolean;
-  message: string;
-  validation: {
-    valid: boolean;
-    errors: ValidationError[];
-    warnings: ValidationWarning[];
-    performedAt: Date;
-    deepValidationPerformed: boolean;
-  };
-  performance: {
-    durationMs: number;
-  };
-}
-```
-
-**Behavior** (default validation FR-071):
-1. Validate schema compliance
-2. Validate policy compatibility (allowedTemplateIds)
-3. Validate secret references exist in SecretStorage
-4. Validate endpoint reachability (healthCheck.url)
-5. Validate declared capabilities vs adapter capabilities
-6. No model calls (no billable cost)
-
-**Behavior** (deep validation, requires user approval FR-072):
-7. Model discovery (listModels) if capabilities.modelDiscovery
-8. Test message send/receive with minimal prompt
-9. Potentially incurs charges; UI must show cost estimate before approval
-
-**Errors**:
-- `PROFILE_NOT_FOUND`: Profile id not found
-- `SECRET_MISSING`: Secret reference not found
-- `NETWORK_ERROR`: Endpoint unreachable
-- `APPROVAL_REQUIRED`: User must approve deep validation
-
----
-
-### Run Diagnostics
-
-**Command ID**: `claudeSwitcher.runDiagnostics`
-
-**Purpose**: Run comprehensive diagnostics on workspace configuration
-
-```typescript
-interface RunDiagnosticsArgs {
-  includeAllProfiles?: boolean;  // Default: only active/default profiles
-}
-
-interface RunDiagnosticsResult {
-  success: boolean;
-  message: string;
-  diagnostics: {
-    workspace: WorkspaceDiagnostics;
-    profiles: ProfileDiagnostics[];
-    policy: PolicyDiagnostics;
-    secrets: SecretsDiagnostics;
-    summary: {
-      totalErrors: number;
-      totalWarnings: number;
-      criticalIssues: string[];
-    };
-  };
-}
-```
-
-**Behavior**:
-1. Validate workspace structure (.claude-switcher directories)
-2. Validate policy file
-3. Validate all (or active) profiles
-4. Detect conflicting inherited configuration
-5. Check secret references
-6. Report all errors and warnings (redacted)
-
----
-
-## UI Commands
-
-### Show Profile Selector
-
-**Command ID**: `claudeSwitcher.showProfileSelector`
-
-**Purpose**: Open profile selection UI (quick pick or full interface
-
-```typescript
-interface ShowProfileSelectorArgs {
-  selectFor?: 'workspace' | 'session';  // Default: workspace
-  sessionId?: string;  // Required if selectFor='session'
-}
-
-interface ShowProfileSelectorResult {
-  success: boolean;
-  action: 'selected' | 'cancelled';
-  selection?: {
-    profileId: string;
-    selectFor: 'workspace' | 'session';
+  result: {
+    endpointId: string;
+    endpointUrl: string;
+    mode: 'continue' | 'new-session';
     sessionId?: string;
+    reloadedAt: Date;
   };
 }
 ```
 
 **Behavior**:
-1. Show Quick Pick dialog with available profiles
-2. Filter by workspace policy allowedTemplateIds
-3. Show adapter, model, trust zone indicators
-4. On selection, invoke `selectProfile` or `selectProfileOverride`
+1. Identify the current Claude Code panel session
+2. Reload the panel with the current active endpoint configuration
+3. If mode='continue', attempt to preserve the current session context
+4. If mode='new-session', start a fresh Claude Code session with the same endpoint
+5. Update status bar to reflect the reload
+
+**Errors**:
+- `NO_ACTIVE_PANEL`: No Claude Code panel is currently open
+- `NO_ACTIVE_ENDPOINT`: No endpoint is configured as active
+- `RELOAD_FAILED`: Panel reload operation failed
 
 ---
 
-### Show HandoffDialog
+### Show Endpoint Picker
 
-**Command ID**: `claudeSwitcher.showHandoffDialog`
+**Command ID**: `claudeSwitcher.showEndpointPicker`
 
-**Purpose**: Show handoff mode selection and summary options UI
+**Purpose**: Open Quick Pick dialog to select endpoint
 
 ```typescript
-interface ShowHandoffDialogArgs {
-  sourceProfileId: string;
-  destinationProfileId: string;
-  sessionId: string;
+interface ShowEndpointPickerArgs {
+  selectFor?: 'active' | 'edit' | 'remove';  // Default: 'active'
+  onlyActive?: boolean;  // If true, only show active endpoint (no-op action)
 }
 
-interface ShowHandoffDialogResult {
+interface ShowEndpointPickerResult {
   success: boolean;
   action: 'selected' | 'cancelled';
   selection?: {
-    mode: 'full' | 'summary' | 'none';
-    summaryOptions?: typeof summaryOptions;
-    recommendedMode: 'full' | 'summary' | 'none';
-    recommendationReason: string;
+    endpointId: string;
+    selectFor: 'active' | 'edit' | 'remove';
   };
 }
 ```
 
 **Behavior**:
-1. Show dialog with three handoff modes
-2. Highlight recommended mode based on trust-zone combination
-3. If summary mode selected, show field inclusion options
-4. On confirm, invoke `switchProfile`
+1. Show Quick Pick dialog with available endpoints
+2. Display URL, label, and connectivity status
+3. Highlight currently active endpoint
+4. Display models with their aliases
+5. On selection, invoke appropriate action (selectActiveEndpoint, editEndpoint, removeEndpoint)
+6. If onlyActive is true, show minimal picker for viewing only
 
 ---
 
-### Show Activity Ledger
+## Status Commands
 
-**Command ID**: `claudeSwitcher.showActivityLedger`
+### Check Endpoint Connectivity
 
-**Purpose**: Show activity ledger view displaying concurrent sessions
+**Command ID**: `claudeSwitcher.checkConnectivity`
 
-```typescript
-interface ShowActivityLedgerArgs {
-  // No arguments
-}
-
-interface ShowActivityLedgerResult {
-  success: boolean;
-  sessions: ActivityLedgerEntry[];
-}
-```
-
----
-
-### Show Policy Editor
-
-**Command ID**: `claudeSwitcher.showPolicyEditor`
-
-**Purpose**: Open workspace policy editor UI
+**Purpose**: Test connectivity to a specific endpoint manually
 
 ```typescript
-interface ShowPolicyEditorArgs {
-  // No arguments
+interface CheckConnectivityArgs {
+  endpointId: string;
 }
 
-interface ShowPolicyEditorResult {
-  success: boolean;
-  policy: WorkspacePolicy;
-}
-```
-
----
-
-## Session Management Commands
-
-### List Active Sessions
-
-**Command ID**: `claudeSwitcher.listActiveSessions`
-
-**Purpose**: List currently active sessions
-
-```typescript
-interface ListActiveSessionsArgs {
-  // No arguments
-}
-
-interface ListActiveSessionsResult {
-  success: boolean;
-  sessions: Session[];
-}
-```
-
----
-
-### Terminate Session
-
-**Command ID**: `claudeSwitcher.terminateSession`
-
-**Purpose**: Terminate an active session
-
-```typescript
-interface TerminateSessionArgs {
-  sessionId: string;
-  confirm: boolean;  // User confirmed termination
-}
-
-interface TerminateSessionResult {
+interface CheckConnectivityResult {
   success: boolean;
   message: string;
-  terminated: {
-    sessionId: string;
-    terminatedAt: Date;
+  endpoint: {
+    id: string;
+    url: string;
+    status: 'untested' | 'connected' | 'unreachable';
+    models: {
+      name: string;
+      alias?: string;
+    }[];
+    latency?: number;  // Response time in ms
+    error?: string;    // Error message if unreachable
   };
 }
 ```
+
+**Behavior**:
+1. Validate endpoint exists
+2. Perform connectivity check (lightweight HTTP request)
+3. Update endpoint status
+4. Return results including latency if successful
+
+**Errors**:
+- `ENDPOINT_NOT_FOUND`: Endpoint id not found
+- `UNREACHABLE`: Endpoint is unreachable (non-blocking)
+
+---
+
+### List Endpoints
+
+**Command ID**: `claudeSwitcher.listEndpoints`
+
+**Purpose**: Get list of all configured endpoints
+
+```typescript
+interface ListEndpointsArgs {
+  // No arguments
+}
+
+interface ListEndpointsResult {
+  success: boolean;
+  endpoints: {
+    id: string;
+    url: string;
+    label: string;
+    hasAuth: boolean;
+    status: 'untested' | 'connected' | 'unreachable';
+    isActive: boolean;
+    models: {
+      name: string;
+      alias?: string;
+    }[];
+  }[];
+  activeEndpointId?: string;
+}
+```
+
+**Behavior**:
+1. Return all configured endpoints
+2. Include connectivity status and active flag
+3. No network calls performed (status from cache)
+
+---
+
+## Export/Import Commands
+
+### Export Configuration
+
+**Command ID**: `claudeSwitcher.exportConfig`
+
+**Purpose**: Export endpoint configuration (auth tokens excluded)
+
+```typescript
+interface ExportConfigArgs {
+  outputPath?: string;  // Optional: user-provided path, default: JSON in clipboard
+  includeAuth: boolean;  // User confirmed they understand auth tokens will NOT be included
+  approved: boolean;    // User approved export
+}
+
+interface ExportConfigResult {
+  success: boolean;
+  message: string;
+  exported: {
+    endpointCount: number;
+    exportedTo: 'clipboard' | 'file';
+    filePath?: string;  // If exported to file
+  };
+}
+```
+
+**Behavior**:
+1. Warn user that auth tokens are NOT included in export
+2. Export endpoints with URLs, labels, models, but NO auth tokens
+3. Save to clipboard or specified path
+4. Export includes endpoint IDs to allow import (may require re-mapping)
+
+**Errors**:
+- `NO_ENDPOINTS_CONFIGURED`: No endpoints to export
+
+---
+
+### Import Configuration
+
+**Command ID**: `claudeSwitcher.importConfig`
+
+**Purpose**: Import endpoint configuration
+
+```typescript
+interface ImportConfigArgs {
+  inputPath?: string;  // Optional: user-provided path, default: read from clipboard
+  confirmOverwrite: boolean;  // User confirmed overwrite if conflict
+  approved: boolean;  // User approved import
+}
+
+interface ImportConfigResult {
+  success: boolean;
+  message: string;
+  imported: {
+    endpointCount: number;
+    newEndpoints: number;
+    updatedEndpoints: number;
+    conflicts: string[];
+  };
+  needAuth: {
+    endpointIds: string[];  // Endpoints requiring auth token configuration
+  };
+}
+```
+
+**Behavior**:
+1. Load configuration from clipboard or specified path
+2. Validate endpoint URLs
+3. Generate new IDs for imported endpoints
+4. For endpoints with auth, mark as needing token configuration
+5. Open dialog to configure auth tokens for endpoints that require them
+6. Import if no conflicts or user confirms overwrite
+
+**Errors**:
+- `ENDPOINT_INVALID_URL`: Import contains invalid URL
+- `CONFIRMATION_REQUIRED`: User must approve import and/or overwrite
 
 ---
 
@@ -781,44 +471,54 @@ interface TerminateSessionResult {
   "contributes": {
     "commands": [
       {
-        "command": "claudeSwitcher.selectProfile",
-        "title": "Select Workspace Profile",
+        "command": "claudeSwitcher.addEndpoint",
+        "title": "Add Endpoint",
+        "category": "Claude Switcher"
+      },
+      {
+        "command": "claudeSwitcher.editEndpoint",
+        "title": "Edit Endpoint",
+        "category": "Claude Switcher"
+      },
+      {
+        "command": "claudeSwitcher.removeEndpoint",
+        "title": "Remove Endpoint",
+        "category": "Claude Switcher"
+      },
+      {
+        "command": "claudeSwitcher.selectActiveEndpoint",
+        "title": "Select Active Endpoint",
         "category": "Claude Switcher",
         "icon": "$(debug-disconnect)"
       },
       {
-        "command": "claudeSwitcher.createProfile",
-        "title": "Create New Profile",
+        "command": "claudeSwitcher.showEndpointPicker",
+        "title": "Show Endpoint Picker",
         "category": "Claude Switcher"
       },
       {
-        "command": "claudeSwitcher.editProfile",
-        "title": "Edit Profile",
+        "command": "claudeSwitcher.checkConnectivity",
+        "title": "Check Endpoint Connectivity",
         "category": "Claude Switcher"
       },
       {
-        "command": "claudeSwitcher.validateProfile",
-        "title": "Validate Profile",
+        "command": "claudeSwitcher.listEndpoints",
+        "title": "List Endpoints",
         "category": "Claude Switcher"
       },
       {
-        "command": "claudeSwitcher.switchProfile",
-        "title": "Switch Profile (Handoff)",
+        "command": "claudeSwitcher.reloadPanel",
+        "title": "Reload Claude Code Panel",
         "category": "Claude Switcher"
       },
       {
-        "command": "claudeSwitcher.setPrivacyMode",
-        "title": "Set Privacy Mode",
+        "command": "claudeSwitcher.exportConfig",
+        "title": "Export Configuration",
         "category": "Claude Switcher"
       },
       {
-        "command": "claudeSwitcher.runDiagnostics",
-        "title": "Run Diagnostics",
-        "category": "Claude Switcher"
-      },
-      {
-        "command": "claudeSwitcher.showActivityLedger",
-        "title": "Show Activity Ledger",
+        "command": "claudeSwitcher.importConfig",
+        "title": "Import Configuration",
         "category": "Claude Switcher"
       }
     ]
@@ -830,13 +530,12 @@ interface TerminateSessionResult {
 
 Additional command categories may be added in future versions:
 
-- **Workspace Management**: Set workspace policy, manage worktree isolation
-- **Advanced Features**: Custom summarizers, advanced redaction rules
-- **Integration Specific**: Adapter-specific commands (e.g., configure Ollama models)
-- **Admin Commands**: For team administrators (audit export, bulk operations)
+- **Advanced Features**: Per-session endpoint overrides, endpoint-specific model selection
+- **Analytics**: Endpoint usage tracking, latency reporting, quota monitoring (via Claude API status endpoints)
+- **Teammate Sharing**: Secure export/import of endpoints (auth tokens always excluded)
 
 Command interface changes require:
-1. Command ID versioning (e.g., `claudeSwitcher.v2.switchProfile`)
+1. Command ID versioning (e.g., `claudeSwitcher.v2.addEndpoint`)
 2. Backward compatibility for existing commands
 3. Updated documentation
 4. Version bump in contract document

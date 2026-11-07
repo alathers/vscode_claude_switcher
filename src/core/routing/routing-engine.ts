@@ -1,259 +1,335 @@
 /**
- * Routing Engine - Core routing decision logic
+ * src/core/routing/routing-engine.ts
  *
- * Determines which model source (subscription, API credits, or Ollama) should
- * handle a given request based on configuration, quota state, and Harvey recommendations.
+ * Routing Engine
  *
- * This is a pure logic module with no vscode imports (Principle IV) for testability.
+ * Active endpoint selection and management (no VS Code API imports).
  */
 
-import type { RoutingConfiguration } from './routing-config';
-import type { QuotaCache } from '../quota/quota-cache';
+import {
+  Endpoint,
+  Model,
+  CreateEndpointInput as EndpointRegistryCreateInput,
+  EndpointRegistry,
+} from '../endpoints/endpoint-registry.js';
 
-/**
- * Model source options
- */
-export type ModelSource = 'subscription' | 'api-credits' | 'ollama';
-
-/**
- * Routing request context
- */
-export interface RoutingRequest {
-  /** Inferred task type */
-  taskType: string;
-
-  /** Optional context for routing heuristics */
-  metadata?: {
-    estimatedTokens?: number;
-    urgency?: 'high' | 'normal' | 'low';
-    features?: string[];
-  };
-
-  /** Correlation ID for logging/tracking */
-  requestId?: string;
+export enum SessionState {
+  IDLE = 'idle',
+  ACTIVE = 'active',
+  LOADING = 'loading',
 }
 
-/**
- * Routing decision
- */
-export interface RoutingDecision {
-  /** Selected model source */
-  source: ModelSource;
-
-  /** Human-readable reason for routing decision */
-  reason: string;
-
-  /** Harvey recommendation (if applicable) */
-  harveyRecommendation?: {
-    model: string;
-    confidence: number;
-  };
-
-  /** Performance metrics */
-  performance?: {
-    latencyMs: number;
-    quotaCheckLatencyMs: number;
-  };
-
-  /** Timestamp when decision was made */
-  timestamp: string; // ISO 8601 string
+export enum ReloadAction {
+  NO_RELOAD = 'no-reload',
+  CONTINUE_RELOAD = 'continue-reload',
+  NEW_SESSION = 'new-session',
+  KEEP_UNCHANGED = 'keep-unchanged',
 }
 
-/**
- * Quota snapshot for display/status bar
- */
-export interface QuotaSnapshot {
-  subscription: {
-    plan: 'pro' | 'max';
-    dailyLimit: number;
-    rollingWindowDays: number;
-    currentUsage: number;
-    remainingQuota: number;
-    percentUsed: number;
-    rollingWindowStart: string;
-    rollingWindowEnd: string;
-  };
-
-  apiCredits: {
-    balance: number;
-    authenticated: boolean;
-    stale: boolean;
-    lastFetchTime: number;
-  };
-
-  ollama: {
-    available: boolean;
-    harveyReachable: boolean;
-    circuitBreakerState: 'closed' | 'open' | 'half-open';
-  };
-}
-
-/**
- * Routing error
- */
-export class RoutingError extends Error {
-  constructor(
-    message: string,
-    public readonly code: 'NO_AVAILABLE_SOURCES' | 'HARVEY_UNREACHABLE' | 'INVALID_CONFIGURATION'
-  ) {
+export class RoutingEngineError extends Error {
+  constructor(message: string) {
     super(message);
-    this.name = 'RoutingError';
+    this.name = 'RoutingEngineError';
   }
 }
 
-/**
- * Routing engine interface
- */
-export interface IRoutingEngine {
-  /**
-   * Determine the routing decision for a request
-   */
-  route(request: RoutingRequest): Promise<RoutingDecision>;
-
-  /**
-   * Check if a routing path is available (has quota/credits)
-   */
-  isAvailable(source: ModelSource): Promise<boolean>;
-
-  /**
-   * Get current quota state for display/status bar
-   */
-  getQuotaState(): QuotaSnapshot;
-
-  /**
-   * Manually trigger quota refresh
-   */
-  refreshQuota(): Promise<void>;
-
-  /**
-   * Reset routing history for testing/debugging
-   */
-  resetHistory(): void;
+export interface ReloadFlowOptions {
+  newSession?: boolean;
+  keepUnchanged?: boolean;
 }
 
-/**
- * Routing Engine Implementation
- *
- * Pure logic module for routing decisions based on quota state and configuration.
- */
-export class RoutingEngine implements IRoutingEngine {
-  private config: RoutingConfiguration;
-  private quotaCache: QuotaCache;
+export interface RegistryEndpoint {
+  url: string;
+  label?: string;
+  hasAuth: boolean;
+  models: Model[];
+}
 
-  constructor(
-    config: RoutingConfiguration,
-    quotaCache: QuotaCache
-  ) {
-    this.config = config;
-    this.quotaCache = quotaCache;
-  }
+export interface GeneratedConfig {
+  endpointUrl: string;
+  requiresAuth: boolean;
+  models: Array<{ name: string; alias?: string }>;
+}
 
-  async route(request: RoutingRequest): Promise<RoutingDecision> {
-    const startTime = performance.now();
+export interface SwitchValidation {
+  canSwitch: boolean;
+  reason?: string;
+}
 
-    // Step 1: Check taskMappings config for explicit route
-    const explicitRoute = this.config.taskMappings[request.taskType];
-    if (explicitRoute && explicitRoute !== 'auto') {
-      // Measure quota check latency specifically
-      const quotaCheckStart = performance.now();
-      const isAvailable = await this.isAvailable(explicitRoute);
-      const quotaCheckLatency = performance.now() - quotaCheckStart;
+export class RoutingEngine {
+  private registry: EndpointRegistry = new EndpointRegistry();
+  private activeEndpointId: string | undefined;
+  private sessionState: SessionState = SessionState.IDLE;
+  private isReloadingFlag: boolean = false;
+  private reloadProgress: number = 0;
+  private reloadError: Error | undefined;
 
-      if (isAvailable) {
-        return {
-          source: explicitRoute,
-          reason: `Explicit mapping for task type '${request.taskType}' to ${explicitRoute}`,
-          timestamp: new Date().toISOString(),
-          performance: {
-            latencyMs: performance.now() - startTime,
-            quotaCheckLatencyMs: quotaCheckLatency
-          }
-        };
-      }
-    }
-
-    // Step 2 & 3: Harvey recommendation (skipped for US3, US4)
-    // Fallback to priority array from config
-    const priority = this.config.priority || ['subscription', 'api-credits', 'ollama'];
-
-    // Step 4 & 5: Check each source in priority order, return first available
-    for (const source of priority) {
-      // Measure quota check latency specifically
-      const quotaCheckStart = performance.now();
-      const isAvailable = await this.isAvailable(source);
-      const quotaCheckLatency = performance.now() - quotaCheckStart;
-
-      if (isAvailable) {
-        return {
-          source,
-          reason: `Priority fallback: ${source}`,
-          timestamp: new Date().toISOString(),
-          performance: {
-            latencyMs: performance.now() - startTime,
-            quotaCheckLatencyMs: quotaCheckLatency
-          }
-        };
-      }
-    }
-
-    // Step 6: No sources available - throw error
-    throw new RoutingError(
-      'No available model sources: subscription exhausted, API credits exhausted, Ollama unavailable',
-      'NO_AVAILABLE_SOURCES'
-    );
-  }
-
-  async isAvailable(source: ModelSource): Promise<boolean> {
-    switch (source) {
-      case 'subscription':
-        return this.quotaCache.subscription.remainingQuota > 0;
-
-      case 'api-credits':
-        return (
-          this.quotaCache.apiCredits.balance > 0 &&
-          this.quotaCache.apiCredits.authenticated
-        );
-
-      case 'ollama':
-        return this.quotaCache.ollama.available;
-
-      default:
-        return false;
+  /**
+   * Registers endpoints.
+   */
+  public registerEndpoints(endpoints: Omit<Endpoint, 'id' | 'createdAt' | 'status'>[]): void {
+    for (const ep of endpoints) {
+      const input: EndpointRegistryCreateInput = {
+        url: ep.url,
+        label: ep.label,
+        hasAuth: ep.hasAuth,
+        models: ep.models,
+      };
+      this.registry.create(input);
     }
   }
 
-  getQuotaState(): QuotaSnapshot {
+  /**
+   * Gets an endpoint by ID.
+   */
+  public getEndpoint(id: string): Endpoint | undefined {
+    return this.registry.getById(id);
+  }
+
+  /**
+   * Gets endpoint by URL.
+   */
+  public getEndpointByUrl(url: string): Endpoint | undefined {
+    return this.registry.getByUrl(url);
+  }
+
+  /**
+   * Lists all endpoints.
+   */
+  public listEndpoints(): Endpoint[] {
+    return this.registry.list();
+  }
+
+  /**
+   *Gets endpoint count.
+   */
+  public getEndpointCount(): number {
+    return this.registry.getCount();
+  }
+
+  /**
+   * Sets active endpoint.
+   */
+  public setActiveEndpoint(id: string): { success: boolean } {
+    if (!this.registry.exists(id)) {
+      throw new RoutingEngineError(`Endpoint not found: ${id}`);
+    }
+
+    this.activeEndpointId = id;
+    return { success: true };
+  }
+
+  /**
+   * Gets active endpoint.
+   */
+  public getActiveEndpoint(): Endpoint | undefined {
+    if (!this.activeEndpointId) {
+      return undefined;
+    }
+    return this.registry.getById(this.activeEndpointId);
+  }
+
+  /**
+   * Gets active endpoint ID.
+   */
+  public getActiveEndpointId(): string | undefined {
+    return this.activeEndpointId;
+  }
+
+  /**
+   * Checks if has active endpoint.
+   */
+  public hasActiveEndpoint(): boolean {
+    return this.activeEndpointId !== undefined;
+  }
+
+  /**
+   * Session State
+   */
+
+  /**
+   * Gets current session state.
+   */
+  public getSessionState(): SessionState {
+    return this.sessionState;
+  }
+
+  /**
+   * Sets session state.
+   */
+  public setSessionState(state: SessionState): void {
+    this.sessionState = state;
+  }
+
+  /**
+   * Detects session state.
+   * Note: Real implementation would check Claude Code panel state.
+   */
+  public detectSessionState(): SessionState {
+    return this.sessionState;
+  }
+
+  /**
+   * Clears session state.
+   */
+  public clearSessionState(): void {
+    this.sessionState = SessionState.IDLE;
+  }
+
+  /**
+   * Reload Action Determination
+   */
+
+  /**
+   * Determines reload action based on session state and options.
+   */
+  public determineReloadAction(options: ReloadFlowOptions = {}): ReloadAction {
+    // Explicitly requested new session
+    if (options.newSession) {
+      return ReloadAction.NEW_SESSION;
+    }
+
+    // Explicitly requested to keep unchanged
+    if (options.keepUnchanged) {
+      return ReloadAction.KEEP_UNCHANGED;
+    }
+
+    // Active session requires user action
+    if (this.sessionState === SessionState.ACTIVE) {
+      return ReloadAction.CONTINUE_RELOAD;
+    }
+
+    // Idle or loading states don't need reload
+    return ReloadAction.NO_RELOAD;
+  }
+
+  /**
+   * Reload Flow State Machine
+   */
+
+  /**
+   * Starts reload flow.
+   */
+  public startReloadFlow(): void {
+    this.isReloadingFlag = true;
+    this.reloadProgress = 0;
+    this.reloadError = undefined;
+  }
+
+  /**
+   * Completes reload flow.
+   */
+  public completeReloadFlow(): void {
+    this.isReloadingFlag = false;
+    this.reloadError = undefined;
+  }
+
+  /**
+   * Fails reload flow with error.
+   */
+  public failReloadFlow(error: Error): void {
+    this.isReloadingFlag = false;
+    this.reloadError = error;
+  }
+
+  /**
+   * Checks if currently reloading.
+   */
+  public isReloading(): boolean {
+    return this.isReloadingFlag;
+  }
+
+  /**
+   * Updates reload progress (0-1).
+   */
+  public updateReloadProgress(progress: number): void {
+    this.reloadProgress = Math.max(0, Math.min(1, progress));
+  }
+
+  /**
+   * Gets reload progress.
+   */
+  public getReloadProgress(): number {
+    return this.reloadProgress;
+  }
+
+  /**
+   * Gets reload error.
+   */
+  public getReloadError(): Error | undefined {
+    return this.reloadError;
+  }
+
+  /**
+   * Configuration Template Generation
+   */
+
+  /**
+   * Generates configuration for active endpoint.
+   */
+  public generateConfig(options: { includeAliases?: boolean; normalizeUrls?: boolean }={}): GeneratedConfig | undefined {
+    const endpoint = this.getActiveEndpoint();
+    if (!endpoint) {
+      return undefined;
+    }
+
     return {
-      subscription: {
-        plan: this.quotaCache.subscription.plan,
-        dailyLimit: this.quotaCache.subscription.dailyLimit,
-        rollingWindowDays: this.quotaCache.subscription.rollingWindowDays,
-        currentUsage: this.quotaCache.subscription.currentUsage,
-        remainingQuota: this.quotaCache.subscription.remainingQuota,
-        percentUsed: this.quotaCache.subscription.percentUsed,
-        rollingWindowStart: this.quotaCache.subscription.rollingWindowStart,
-        rollingWindowEnd: this.quotaCache.subscription.rollingWindowEnd
-      },
-      apiCredits: {
-        balance: this.quotaCache.apiCredits.balance,
-        authenticated: this.quotaCache.apiCredits.authenticated,
-        stale: this.quotaCache.apiCredits.stale,
-        lastFetchTime: this.quotaCache.apiCredits.lastFetchTime
-      },
-      ollama: {
-        available: this.quotaCache.ollama.available,
-        harveyReachable: this.quotaCache.ollama.harveyReachable,
-        circuitBreakerState: this.quotaCache.ollama.circuitBreakerState
-      }
+      endpointUrl: endpoint.url,
+      requiresAuth: endpoint.hasAuth,
+      models: endpoint.models.map((m) => ({
+        name: m.name,
+        alias: options.includeAliases ? m.alias : undefined,
+      })),
     };
   }
 
-  async refreshQuota(): Promise<void> {
-    // TODO: Implement quota refresh logic
-    // This will involve calling quota provider to fetch updated subscription usage and API credits balance
+  /**
+   * Endpoint Switching Validation
+   */
+
+  /**
+   * Validates if endpoint can be switched to.
+   */
+  public canSwitchTo(endpointId: string): SwitchValidation {
+    if (!this.registry.exists(endpointId)) {
+      return {
+        canSwitch: false,
+        reason: 'Endpoint not found',
+      };
+    }
+
+    if (this.activeEndpointId === endpointId) {
+      return {
+        canSwitch: false,
+        reason: 'Endpoint is already active',
+      };
+    }
+
+    return {
+      canSwitch: true,
+    };
   }
 
-  resetHistory(): void {
-    // TODO: Implement routing history reset for testing/debugging
+  /**
+   * Utility Methods
+   */
+
+  /**
+   * Checks if has any endpoints.
+   */
+  public hasEndpoints(): boolean {
+    return this.registry.getCount() > 0;
+  }
+
+  /**
+   * Clears all data.
+   */
+  public clear(): void {
+    this.registry.clear();
+    this.activeEndpointId = undefined;
+    this.sessionState = SessionState.IDLE;
+    this.isReloadingFlag = false;
+    this.reloadProgress = 0;
+    this.reloadError = undefined;
   }
 }

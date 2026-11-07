@@ -1,115 +1,163 @@
-import * as crypto from 'crypto';
-
 /**
- * Pure logic cryptography utility
+ * src/utils/crypto-utils.ts
  *
- * Constitution requirement: MUST NOT import vscode module
- * Uses Node.js built-in crypto module
+ * Crypto Utilities
+ *
+ * Hash and redaction helpers for secrets (no VS Code API imports).
  */
 
-/**
- * Generate random bytes hex string
- * @param length - Number of bytes (default: 16 for 128-bit)
- * @returns Hex string of random bytes
- */
-export function generateRandomHex(length: number = 16): string {
- return crypto.randomBytes(length).toString('hex');
-}
+export class CryptoUtils {
+  /**
+   * Hashes a secret string using a simple hash function.
+   * Not cryptographically secure, suitable for logging/tracing only.
+   *
+   * @param secret - Secret string to hash
+   * @returns Hashed string representation
+   */
+  public static hashSecret(secret: string): string {
+    if (secret === null || secret === undefined) {
+      return '[null]';
+    }
 
-/**
- * Generate random bytes base64 string
- * @param length - Number of bytes (default: 16 for 128-bit)
- * @returns Base64 string of random bytes
- */
-export function generateRandomBase64(length: number = 16): string {
- return crypto.randomBytes(length).toString('base64');
-}
+    const str = String(secret);
+    let hash = 0;
 
-/**
- * Generate SHA-256 hash of input
- * @param input - String to hash
- * @returns Hex string hash
- */
-export function sha256(input: string): string {
- return crypto.createHash('sha256').update(input).digest('hex');
-}
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = (hash << 5) - hash + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
 
-/**
- * Generate SHA-512 hash of input
- * @param input - String to hash
- * @returns Hex string hash
- */
-export function sha512(input: string): string {
- return crypto.createHash('sha512').update(input).digest('hex');
-}
+    // Convert to positive and encode in hex-like format
+    const positiveHash = Math.abs(hash);
+    return Buffer.from(positiveHash.toString()).toString('base64').slice(0, 16);
+  }
 
-/**
- * Generate a unique ID (v4 UUID)
- * @returns UUID v4 as string
- */
-export function generateUUID(): string {
- return crypto.randomUUID();
-}
+  /**
+   * Redacts a secret string.
+   *
+   * @param secret - Secret string to redact (unused but kept for API consistency)
+   * @param placeholder - Custom placeholder (default: '[REDACTED]')
+   * @returns Redacted string
+   */
+  public static redactSecret(_secret: string | null | undefined, placeholder?: string): string {
+    return placeholder ?? '[REDACTED]';
+  }
 
-/**
- * Generate a short unique ID (base64url, 16 bytes = 128-bit of entropy)
- * @returns Short ID as base64url string (no padding)
- */
-export function generateShortId(): string {
- return crypto.randomBytes(16).toString('base64url');
-}
+  /**
+   * Redacts secrets from a string using regex patterns.
+   *
+   * @param text - Text to redact from
+   * @param patterns - Array of regex patterns to match
+   * @param placeholder - Custom placeholder (default: '[REDACTED]')
+   * @returns Text with redacted secrets
+   */
+  public static redactFromString(
+    text: string,
+    patterns: RegExp[],
+    placeholder?: string
+  ): string {
+    const ph = placeholder ?? '[REDACTED]';
+    let result = text;
 
-/**
- * Hash sensitive data with salt for storage
- * @param data - Sensitive data to hash
- * @param salt - Salt for hashing
- * @returns Salted hash as hex string
- */
-export function hashWithSalt(data: string, salt: string): string {
- return crypto.createHash('sha256').update(`${salt}${data}`).digest('hex');
-}
+    for (const pattern of patterns) {
+      result = result.replace(pattern, ph);
+    }
 
-/**
- * Constant-time comparison to prevent timing attacks
- * @param a - First value
- * @param b - Second value
- * @returns True if equal
- */
-export function constantTimeEqual(a: Buffer | string, b: Buffer | string): boolean {
- const bufA = typeof a === 'string' ? Buffer.from(a, 'utf8') : a;
- const bufB = typeof b === 'string' ? Buffer.from(b, 'utf8') : b;
+    return result;
+  }
 
- if (bufA.length !== bufB.length) {
-  return false;
- }
+  /**
+   * Deep redacts secrets from an object.
+   *
+   * @param obj - Object to redact
+   * @param secretKeys - Array of keys (or string values) that are secrets
+   * @param placeholder - Custom placeholder (default: '[REDACTED]')
+   * @returns Object with redacted secrets
+   */
+  public static redactFromObject(
+    obj: Record<string, unknown>,
+    secretKeys: string[],
+    placeholder?: string
+  ): Record<string, unknown> {
+    const ph = placeholder ?? '[REDACTED]';
+    const result = this.deepClone(obj);
 
- return crypto.timingSafeEqual(bufA, bufB);
-}
+    const processValue = (value: unknown): unknown => {
+      if (value === null || value === undefined) {
+        return value;
+      }
 
-/**
- * Generate HMAC-SHA256 signature
- * @param data - Data to sign
- * @param secret - Secret key
- * @returns HMAC signature as hex string
- */
-export function hmacSha256(data: string, secret: string): string {
- return crypto.createHmac('sha256', secret).update(data).digest('hex');
-}
+      if (typeof value === 'string') {
+        if (secretKeys.includes(value)) {
+          return ph;
+        }
+        return value;
+      }
 
-/**
- * Encode to base64url (URL-safe base64 without padding)
- * @param input - String to encode
- * @returns Base64url string
- */
-export function base64urlEncode(input: string): string {
- return Buffer.from(input, 'utf8').toString('base64url');
-}
+      if (Array.isArray(value)) {
+        return value.map((v) => processValue(v));
+      }
 
-/**
- * Decode from base64url
- * @param input - Base64url string to decode
- * @returns Decoded string
- */
-export function base64urlDecode(input: string): string {
- return Buffer.from(input, 'base64url').toString('utf8');
+      if (typeof value === 'object') {
+        const processed: Record<string, unknown> = {};
+        for (const [key, val] of Object.entries(value)) {
+          if (secretKeys.includes(key)) {
+            processed[key] = ph;
+          } else {
+            processed[key] = processValue(val);
+          }
+        }
+        return processed;
+      }
+
+      return value;
+    };
+
+    for (const key of Object.keys(result)) {
+      if (secretKeys.includes(key)) {
+        result[key] = ph;
+      } else {
+        result[key] = processValue(result[key]);
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Gets common secret patterns for redaction.
+   *
+   * @returns Array of regex patterns for common secrets
+   */
+  public static getCommonSecretPatterns(): RegExp[] {
+    return [
+      // API keys: sk-ant-api03-xxx, Bearer tokens, etc.
+      /sk-ant-[a-zA-Z0-9-_]+/g,
+      /api[_-]?key["\s:]+["\']?[a-zA-Z0-9-_]+["\']?/gi,
+      /bearer["\s:]+["\']?[a-zA-Z0-9-_=./]+["\']?/gi,
+      // Token-like strings
+      /[a-zA-Z0-9]{32,}/g,
+    ];
+  }
+
+  /**
+   * Deep clones an object.
+   */
+  private static deepClone<T>(obj: T): T {
+    if (obj === null || typeof obj !== 'object') {
+      return obj;
+    }
+
+    if (Array.isArray(obj)) {
+      return obj.map((item) => this.deepClone(item)) as unknown as T;
+    }
+
+    const cloned: Record<string, unknown> = {};
+    for (const key of Object.keys(obj)) {
+      cloned[key] = this.deepClone((obj as Record<string, unknown>)[key]);
+    }
+
+    return cloned as T;
+  }
 }

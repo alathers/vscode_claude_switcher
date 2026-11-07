@@ -1,7 +1,7 @@
 {
   "name": "vscode-claude-switcher",
   "displayName": "Claude Switcher - Model Profile Orchestrator",
-  "description": "VS Code extension for managing and switching between AI coding-agent model profiles during development sessions",
+  "description": "VS Code extension for managing AI model profiles with intelligent cost optimization, routing across subscription, API credits, and local Ollama models",
   "version": "0.1.0",
   "publisher": "claude-switcher",
   "license": "MIT",

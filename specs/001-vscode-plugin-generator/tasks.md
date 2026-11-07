@@ -3,13 +3,13 @@
 description: "Task list for feature implementation"
 ---
 
-# Tasks: VS Code Model Profile Orchestrator
+# Tasks: VS Code Claude Model Rotator
 
 **Input**: Design documents from `/specs/001-vscode-plugin-generator/`
 
-**Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
+**Prerequisites**: spec.md (required for user stories), contracts/api-commands.md (required for API contracts)
 
-**Tests**: Tests are MANDATORY per spec - this project requires dual testing strategy (Vitest for pure logic, VS Code integration tests for extension behavior)
+**Tests**: Tests are MANDATORY per spec - this project uses dual testing strategy (Vitest for pure logic, VS Code integration tests for extension behavior)
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
@@ -26,18 +26,11 @@ description: "Task list for feature implementation"
 
 ---
 
-## Phase 1: Setup (Shared Infrastructure)
+## Phase 1: Setup (Project Initialization)
 
 **Purpose**: Project initialization and basic structure
 
-- [x] T001 Create project structure: src/core/(state/, policy/, adapters/, validation/, handoff/, audit/), src/vscode/(configuration/, ui/, commands/, integration/), src/utils/, tests/unit/, tests/integration/
-- [x] T002 Initialize TypeScript project with VS Code Extension API dependencies (vsce, @types/vscode)
-- [x] T003 [P] Configure TypeScript strict mode in tsconfig.json (compilerOptions.strict = true)
-- [x] T004 [P] Configure ESLint for TypeScript with recommended rules
-- [x] T005 [P] Configure Vitest for unit tests in vitest.config.ts
-- [x] T006 [P] Configure VS Code Test Runner for integration tests
-- [x] T007 Create .vscodeignore to exclude tests and development files from VSIX
-- [x] T008 Create package.json base structure with manifests (activationEvents, contributes.commands, contributes.views)
+- [X] T001 Create project structure: src/core/(endpoints/, status/, routing/), src/vscode/(configuration/, ui/, commands/, integration/), src/utils/, tests/unit/, tests/integration/
 
 ---
 
@@ -49,472 +42,234 @@ description: "Task list for feature implementation"
 
 ### Pure Logic Utilities (No VS Code API Dependencies)
 
-- [x] T009 [P] Create path-normalizer.ts in src/utils/path-normalizer.ts - Platform-agnostic path handling using path, os.homedir(), vscode.Uri (no VS Code API imports)
-- [x] T010 [P] Create logger.ts in src/utils/logger.ts - Core logger with redaction support, no VS Code API imports
-- [x] T011 [P] Create crypto-utils.ts in src/utils/crypto-utils.ts - Hash and redaction helpers for secrets (no VS Code API imports)
-- [x] T012 [P] Create retry.ts in src/utils/retry.ts - Retry logic for endpoint checks, no VS Code API imports
+- [X] T002 [P] Create url-validator.ts in src/utils/url-validator.ts - HTTP/HTTPS URL validation logic (no VS Code API imports)
+- [X] T003 [P] Create logger.ts in src/utils/logger.ts - Core logger with redaction support, no VS Code API imports
+- [X] T004 [P] Create crypto-utils.ts in src/utils/crypto-utils.ts - Hash and redaction helpers for secrets (no VS Code API imports)
+- [X] T005 [P] Create retry.ts in src/utils/retry.ts - Retry logic for endpoint checks, no VS Code API imports
 
 ### Core State Management (Pure Logic)
 
-- [x] T013 Create profile-registry.ts in src/core/state/profile-registry.ts - Profile loading from YAML, merging defaults, validation logic (no VS Code API imports)
-- [x] T014 [P] Create state-machine.ts in src/core/state/state-machine.ts - Activation state transitions, handoff state machine logic (no VS Code API imports)
-- [x] T015 [P] Create activity-tracker.ts in src/core/state/activity-tracker.ts - Concurrent session tracking, conflict detection logic (no VS Code API imports)
-
-### Policy Engine (Pure Logic)
-
-- [x] T016 Create policy-engine.ts in src/core/policy/policy-engine.ts - Privacy mode enforcement, request classification (model-provider vs. supporting network), routing decisions (no VS Code API imports)
-- [x] T017 [P] Create policy-parser.ts in src/core/policy/policy-parser.ts - Workspace policy YAML parsing, validation logic (no VS Code API imports)
-- [x] T018 [P] Create guard-distributor.ts in src/core/policy/guard-distributor.ts - Approval flow, timeout tracking, multi-approver logic (no VS Code API imports)
-
-### Adapter Interface (Pure Logic)
-
-- [ ] T019 Create contract.ts in src/core/adapters/contract.ts - Adapter abstract interface with capability declarations (streaming, tools, fileEdits, commands, modelDiscovery, transcriptObservable), no VS Code API imports
-- [ ] T020 [P] Create native-claude.ts stub in src/core/adapters/native-claude.ts - Claude Code CLI + config manipulation interface stub (implementation in integration layer)
-- [ ] T021 [P] Create anthropic-compatible.ts stub in src/core/adapters/anthropic-compatible.ts - Anthropic-compatible HTTP API adapter stub
-- [ ] T022 [P] Create openai-compatible.ts stub in src/core/adapters/openai-compatible.ts - OpenAI-compatible HTTP API adapter stub
-- [ ] T023 [P] Create ollama.ts stub in src/core/adapters/ollama.ts - Ollama HTTP API adapter stub
-- [ ] T024 [P] Create generic-command.ts stub in src/core/adapters/generic-command.ts - Shell command with sanitized environment adapter stub
-
-### Validation Logic (Pure Logic)
-
-- [ ] T025 Create profile-validator.ts in src/core/validation/profile-validator.ts - Schema validation, policy compatibility, endpoint reachability checks (no VS Code API imports)
-- [ ] T026 [P] Create capability-checker.ts in src/core/validation/capability-checker.ts - Adapter capability validation vs. adapter declarations (no VS Code API imports)
-- [ ] T027 [P] Create secret-resolution.ts in src/core/validation/secret-resolution.ts - Secret reference validation logic (VS Code SecretStorage access isolated in vscode layer)
-
-### Handoff Logic (Pure Logic)
-
-- [ ] T028 Create summarizer.ts in src/core/handoff/summarizer.ts - Local summarizer, deterministic outline fallback (no VS Code API imports)
-- [ ] T029 [P] Create transcript-oracle.ts in src/core/handoff/transcript-oracle.ts - Transcript retrieval via adapters interface (no VS Code API imports)
-- [ ] T030 [P] Create handoff-serializer.ts in src/core/handoff/handoff-serializer.ts - Handoff packet creation, metadata tracking (no transcript/summary content storage) (no VS Code API imports)
-
-### Audit Logging (Pure Logic)
-
-- [ ] T031 Create audit-writer.ts in src/core/audit/audit-writer.ts - Audit log writing without prohibited content (no prompts, transcript, code, tokens, secrets stored) (no VS Code API imports)
-- [ ] T032 [P] Create redaction-engine.ts in src/core/audit/redaction-engine.ts - Secret and internal content redaction logic (no VS Code API imports)
+- [X] T006 Create endpoint-registry.ts in src/core/endpoints/endpoint-registry.ts - Endpoint CRUD operations, model management, validation logic (no VS Code API imports)
+- [X] T007 [P] Create status-tracker.ts in src/core/status/status-tracker.ts - Endpoint connectivity status tracking, latency monitoring (no VS Code API imports)
+- [X] T008 [P] Create routing-engine.ts in src/core/routing/routing-engine.ts - Active endpoint selection and management (no VS Code API imports)
 
 ### VS Code Integration Layer (All VS Code API Access Isolated Here)
 
-- [ ] T033 Create workspace-scoped.ts in src/vscode/configuration/workspace-scoped.ts - VS Code workspace configuration read/write (isolates VS Code API access)
-- [ ] T034 [P] Create secret-storage.ts in src/vscode/configuration/secret-storage.ts - VS Code SecretStorage wrapper (isolates VS Code API access)
-- [ ] T035 [P] Create file-manager.ts in src/vscode/configuration/file-manager.ts - VS Code fs access adapter (isolates VS Code API access)
+- [X] T009 Create workspace-config.ts in src/vscode/configuration/workspace-config.ts - VS Code workspace configuration persistence (isolates VS Code API access)
+- [X] T010 [P] Create secret-storage.ts in src/vscode/configuration/secret-storage.ts - VS Code SecretStorage wrapper for auth tokens (isolates VS Code API access)
+- [X] T011 [P] Create claude-code-integrator.ts in src/vscode/integration/claude-code-integrator.ts - Claude Code panel reload, configuration file manipulation, interface management (isolates VS Code API access)
 
 ### Extension Entry Point
 
-- [ ] T036 Create extension.ts in src/vscode/extension.ts - Extension activation/deactivation, command registration (all VS Code API access here)
+- [X] T012 Create extension.ts in src/vscode/extension.ts - Extension activation/deactivation, command registration (all VS Code API access here)
 
-### Unit Tests for Foundational Logic (Mandatory per Constitution)
+### Unit Tests for Foundational Logic (Mandatory TDD - Write First, Ensure They Fail)
 
-- [x] T037 [P] Test profile-registry.ts in tests/unit/core/state/profile-registry.test.ts
-- [x] T038 [P] Test state-machine.ts in tests/unit/core/state/state-machine.test.ts
-- [x] T039 [P] Test activity-tracker.ts in tests/unit/core/state/activity-tracker.test.ts
-- [x] T040 [P] Test policy-engine.ts in tests/unit/core/policy/policy-engine.test.ts
-- [x] T041 [P] Test policy-parser.ts in tests/unit/core/policy/policy-parser.test.ts
-- [x] T042 [P] Test guard-distributor.ts in tests/unit/core/policy/guard-distributor.test.ts
-- [ ] T043 [P] Test adapter contract.ts in tests/unit/core/adapters/contract.test.ts
-- [ ] T044 [P] Test profile-validator.ts in tests/unit/core/validation/profile-validator.test.ts
-- [ ] T045 [P] Test capability-checker.ts in tests/unit/core/validation/capability-checker.test.ts
-- [ ] T046 [P] Test secret-resolution.ts in tests/unit/core/validation/secret-resolution.test.ts
-- [ ] T047 [P] Test summarizer.ts in tests/unit/core/handoff/summarizer.test.ts
-- [ ] T048 [P] Test transcript-oracle.ts in tests/unit/core/handoff/transcript-oracle.test.ts
-- [ ] T049 [P] Test handoff-serializer.ts in tests/unit/core/handoff/handoff-serializer.test.ts
-- [ ] T050 [P] Test audit-writer.ts in tests/unit/core/audit/audit-writer.test.ts
-- [ ] T051 [P] Test redaction-engine.ts in tests/unit/core/audit/redaction-engine.test.ts
-- [ ] T052 [P] Test utils/path-normalizer.ts in tests/unit/utils/path-normalizer.test.ts
-- [ ] T053 [P] Test utils/logger.ts in tests/unit/utils/logger.test.ts
-- [ ] T054 [P] Test utils/crypto-utils.ts in tests/unit/utils/crypto-utils.test.ts
-- [ ] T055 [P] Test utils/retry.ts in tests/unit/utils/retry.test.ts
+- [X] T013 [P] Test url-validator.ts in tests/unit/utils/url-validator.test.ts
+- [X] T014 [P] Test logger.ts in tests/unit/utils/logger.test.ts
+- [X] T015 [P] Test crypto-utils.ts in tests/unit/utils/crypto-utils.test.ts
+- [X] T016 [P] Test retry.ts in tests/unit/utils/retry.test.ts
+- [X] T017 [P] Test endpoint-registry.ts in tests/unit/core/endpoints/endpoint-registry.test.ts
+- [X] T018 [P] Test status-tracker.ts in tests/unit/core/status/status-tracker.test.ts
+- [X] T019 [P] Test routing-engine.ts in tests/unit/core/routing/routing-engine.test.ts
 
-**Checkpoint**: Foundation ready - user story implementation can now begin in parallel
+**Checkpoint**: Foundation ready - user story implementation can now begin
 
 ---
 
-## Phase 3: User Story 1 - Select and activate a profile (Priority: P1) 🎯 MVP
+## Phase 3: User Story 1 - Configure model endpoints (Priority: P1) 🎯 MVP
 
-**Goal**: Developers can select workspace default profiles from available profiles (user-level, repository templates), see resolved configuration (provider, model, trust zone), and have profile activate without restarting VS Code. Secret references validate before activation.
+**Goal**: Developers can configure one or more Claude API endpoints (URL, auth token, models with names and aliases), with connectivity status tracking and persistence across VS Code restarts.
 
-**Independent Test**: A developer can open a trusted workspace with a repository template and user profile overlay, select from available profiles through command palette or status bar, see the resolved provider, model, trust zone, and capability state, and have the profile immediately active. Missing secret references block activation with redacted actionable diagnostics.
+**Independent Test**: A developer adds endpoints through command palette, provides URLs, optional auth tokens, and models with names and aliases. Endpoints are saved, persisted across VS Code restarts, and connectivity status is displayed (connected, untested, unreachable). SSH tunnel endpoints (localhost URLs) work without auth tokens.
 
-### Unit Tests for User Story 1 (Mandatory - Write First, Ensure They Fail)
+### Unit Tests for User Story 1 (Mandatory TDD - Write First, Ensure They Fail)
 
-- [ ] T056 [P] [US1] Profile loading from user directory ~/.claude-claude-switcher/profiles/ in tests/unit/core/state/profile-registry.test.ts
-- [ ] T057 [P] [US1] Profile template overlay merging (repository template + user overlay) in tests/unit/core/state/profile-registry.test.ts
-- [ ] T058 [P] [US1] Secret reference validation check in tests/unit/core/validation/secret-resolution.test.ts
-- [ ] T059 [P] [US1] Profile activation state transition validation in tests/unit/core/state/state-machine.test.ts
-- [ ] T060 [P] [US1] Schema validation for profile YAML (including credential.secretRef null for templates) in tests/unit/core/validation/profile-validator.test.ts
+- [ ] T020 [P] [US1] Endpoint CRUD operations (add, edit, remove) in tests/unit/core/endpoints/endpoint-registry.test.ts
+- [ ] T021 [P] [US1] Model name and alias storage/validation in tests/unit/core/endpoints/endpoint-registry.test.ts
+- [ ] T022 [P] [US1] Endpoint validation (URL format, models list) in tests/unit/core/endpoints/endpoint-registry.test.ts
+- [ ] T023 [P] [US1] Unique endpoint ID generation in tests/unit/core/endpoints/endpoint-registry.test.ts
+- [ ] T024 [P] [US1] Connectivity status tracking (connected/untested/unreachable) in tests/unit/core/status/status-tracker.test.ts
+- [ ] T025 [P] [US1] Latency measurement and caching in tests/unit/core/status/status-tracker.test.ts
+- [ ] T026 [P] [US1] Secret reference redaction in tests/unit/utils/crypto-utils.test.ts
 
-### Integration Tests for User Story 1 (Mandatory - Write First, Ensure They Fail)
+### Integration Tests for User Story 1 (Mandatory TDD - Write First, Ensure They Fail)
 
-- [ ] T061 [P] [US1] Profile selection command registration in tests/integration/vscode/extension.test.ts
-- [ ] T062 [P] [US1] Profile activation via command palette in tests/integration/ui/profile-selector.test.ts
-- [ ] T063 [P] [US1] Profile activation via status bar selector in tests/integration/vscode/status-bar.test.ts
-- [ ] T064 [P] [US1] Secret reference validation with VS Code SecretStorage in tests/integration/vscode/secret-storage.test.ts
-- [ ] T065 [P] [US1] Profile template overlay from .claude-switcher/templates/ in tests/integration/vscode/configuration.test.ts
+- [ ] T027 [P] [US1] Add endpoint command registration in tests/integration/vscode/extension.test.ts
+- [ ] T028 [P] [US1] Webview UI for endpoint creation in tests/integration/ui/endpoint-editor.test.ts
+- [ ] T029 [P] [US1] Secret storage integration with VS Code SecretStorage in tests/integration/vscode/secret-storage.test.ts
+- [ ] T030 [P] [US1] Endpoint configuration persistence in tests/integration/vscode/configuration.test.ts
 
 ### Implementation for User Story 1
 
-- [ ] T066 [P] [US1] Implement profile selector UI in src/vscode/ui/profiles/profile-selector.ts (QuickPick dialog displaying available profiles with adapter, model, trust zone indicators)
-- [ ] T067 [P] [US1] Implement profile editor UI in src/vscode/ui/profiles/profile-editor.ts (Basic profile creation/editing form, secret reference input field)
-- [ ] T068 [US1] Implement profile-commands.ts in src/vscode/commands/profile-commands.ts (Commands: selectProfile, selectProfileOverride, createProfile, duplicateProfile, deleteProfile, validateProfile)
-- [ ] T069 [US1] Implement secret-storage.ts integration in src/vscode/configuration/secret-storage.ts (Wrap vscode.ExtensionContext.secrets, provide getSecret, setSecret, deleteSecret, listSecrets methods)
-- [ ] T070 [US1] Implement profile loading with template overlay in src/core/state/profile-registry.ts (Load user profiles from ~/.claude-claude-switcher/profiles/, merge with repository templates from .claude-switcher/templates/)
-- [ ] T071 [US1] Implement profile activation state machine in src/core/state/state-machine.ts (State transition: draft → validated → active, handle missing secrets, rollback on failure)
-- [ ] T072 [US1] Implement profile validation in src/core/validation/profile-validator.ts (Schema compliance, policy compatibility, secret reference existence, endpoint reachability check)
-- [ ] T073 [US1] Implement status bar indicator in src/vscode/integration/status-bar.ts (Display active profile with color-coded badge: green=local, yellow=private-network, orange=cloud, error=invalid)
-- [ ] T074 [US1] Add audit logging for profile selection and activation in src/core/audit/audit-writer.ts (Log events: profile-selected, profile-validation-failed, with profile ID, timestamp, no secrets)
-- [ ] T075 [US1] Add redaction for secret references in error messages in src/vscode/commands/profile-commands.ts (Replace secret values with hash identifiers or [REDACTED] in all user-facing error messages)
-- [ ] T076 [US1] Update extension.ts to register profile commands and status bar in src/vscode/extension.ts (Register claudeSwitcher.selectProfile, claudeSwitcher.createProfile, claudeSwitcher.validateProfile, status bar item)
+- [ ] T031 [P] [US1] Implement URL validation in src/utils/url-validator.ts (Validate HTTP/HTTPS URLs, support localhost and SSH tunnel URLs, reject malformed URLs - FR-002)
+- [ ] T032 [P] [US1] Implement endpoint registry in src/core/endpoints/endpoint-registry.ts (CRUD operations for endpoints with URL, auth token, label, models [name, alias], generate unique IDs, validate endpoint configuration - FR-001, FR-003, FR-004, FR-005)
+- [ ] T033 [P] [US1] Implement model management in src/core/endpoints/endpoint-registry.ts (Add/edit/remove models, validate model names, support optional aliases, ensure models scoped to endpoints - FR-006, FR-007)
+- [ ] T034 [P] [US1] Implement status tracker in src/core/status/status-tracker.ts (Track connectivity status: connected/untested/unreachable, measure latency, cache results, perform lightweight connectivity checks that don't consume API quota - FR-020, FR-021)
+- [ ] T035 [P] [US1] Implement workspace config in src/vscode/configuration/workspace-config.ts (Persist endpoint configuration across VS Code restarts, load configuration on activation - FR-004)
+- [ ] T036 [P] [US1] Implement secret storage in src/vscode/configuration/secret-storage.ts (Wrap vscode.ExtensionContext.secrets, getSecret/setSecret/deleteSecret methods, store auth tokens securely - FR-003, FR-044)
+- [ ] T037 [US1] Implement endpoint editor webview UI in src/vscode/ui/endpoints/endpoint-editor.ts (Form with URL input, auth token input, models list with name/alias fields, add/edit/remove model buttons, validation feedback)
+- [ ] T038 [US1] Implement endpoint-commands.ts in src/vscode/commands/endpoint-commands.ts (Commands: addEndpoint, editEndpoint, removeEndpoint, validate URL, manage models, handle secret storage)
+- [ ] T039 [US1] Update extension.ts to register endpoint commands in src/vscode/extension.ts (Register claudeSwitcher.addEndpoint, claudeSwitcher.editEndpoint, claudeSwitcher.removeEndpoint)
 
-**Checkpoint**: At this point, User Story 1 should be fully functional and testable independently. Developers can select and activate profiles, see resolved configuration, and missing secrets block with clear diagnostics.
+**Checkpoint**: At this point, User Story 1 should be fully functional and testable independently. Developers can configure endpoints, add models, and see connectivity status.
 
 ---
 
-## Phase 4: User Story 2 - Switch profiles with handoff (Priority: P1)
+## Phase 4: User Story 2 - Select active model endpoint with reload (Priority: P1) 🎯 Critical Path
 
-**Goal**: Developers can switch between different AI model profiles during an open VS Code session, optionally transferring conversation context between providers with explicit control over what gets transferred (full transcript, reviewed summary, or no-context).
+**Goal**: Developers can select which configured endpoint should receive Claude API calls, with automatic reload of the VS Code Claude Code panel to use the new endpoint. Handles the complex interface between plugin configuration and VS Code's Claude Code infrastructure.
 
-**Independent Test**: A developer with an active conversation selects a different profile through status bar or command palette, sees handoff options (full transcript, reviewed summary, no-context), views recommended mode based on trust-zone combination, configures summary fields (include code, sensitive data, tool output, diffs, command output, paths), selects handoff mode, and context transfers to new profile.
+**Independent Test**: A developer with multiple endpoints configured selects one as active. The plugin detects if Claude Code panel is active with an ongoing session, prompts user with options (continue with reload, keep unchanged, start new session), and reloads the panel to use the new endpoint. Subsequent Claude API calls route to the selected endpoint.
 
-### Unit Tests for User Story 2 (Mandatory - Write First, Ensure They Fail)
+**Technical Challenge**: This is the most complex part of the implementation - requires interfacing with VS Code's Claude Code configuration files, managing panel reload timing, handling active sessions, and ensuring seamless transition.
 
-- [ ] T077 [P] [US2] Handoff mode selection logic (full/summary/none) in tests/unit/core/state/state-machine.test.ts
-- [ ] T078 [P] [US2] Summary generation with field inclusion/exclusion logic in tests/unit/core/handoff/summarizer.test.ts
-- [ ] T079 [P] [US2] Transcript retrieval via adapter in tests/unit/core/handoff/transcript-oracle.test.ts
-- [ ] T080 [P] [US2] Handoff metadata creation (metadata only, no content) in tests/unit/core/handoff/handoff-serializer.test.ts
+### Unit Tests for User Story 2 (Mandatory TDD - Write First, Ensure They Fail)
 
-### Integration Tests for User Story 2 (Mandatory - Write First, Ensure They Fail)
+- [ ] T040 [P] [US2] Active endpoint selection logic in tests/unit/core/routing/routing-engine.test.ts
+- [ ] T041 [P] [US2] Session detection and state management in tests/unit/core/routing/routing-engine.test.ts
+- [ ] T042 [P] [US2] Prompt scenario selection (continue/keep/new-session) in tests/unit/core/routing/routing-engine.test.ts
+- [ ] T043 [P] [US2] Configuration file template generation in tests/unit/core/routing/routing-engine.test.ts
+- [ ] T044 [P] [US2] Reload flow state machine (config update → panel reload → verification) in tests/unit/core/routing/routing-engine.test.ts
 
-- [ ] T081 [P] [US2] Profile switching command in tests/integration/vscode/extension.test.ts
-- [ ] T082 [P] [US2] Handoff dialog UI in tests/integration/ui/handoff-dialog.test.ts
-- [ ] T083 [P] [US2] Summary editor UI for field configuration in tests/integration/ui/summary-editor.test.ts
-- [ ] T084 [P] [US2] End-to-end profile switching flow in tests/integration/end-to-end.test.ts
+### Integration Tests for User Story 2 (Mandatory TDD - Write First, Ensure They Fail)
+
+- [ ] T045 [P] [US2] Select active endpoint command in tests/integration/vscode/extension.test.ts
+- [ ] T046 [P] [US2] Claude Code panel detection in tests/integration/vscode/claude-code.test.ts
+- [ ] T047 [P] [US2] Panel reload flow in tests/integration/vscode/claude-code.test.ts
+- [ ] T048 [P] [US2] Session prompt UI in tests/integration/ui/session-prompt.test.ts
+- [ ] T049 [P] [US2] Configuration file manipulation in tests/integration/vscode/configuration.test.ts
+- [ ] T050 [P] [US2] End-to-end endpoint switching with reload in tests/integration/end-to-end.test.ts
 
 ### Implementation for User Story 2
 
-- [ ] T085 [P] [US2] Implement handoff state machine transitions in src/core/state/state-machine.ts (States: active → switching → active or terminated, handle handoff completion, failure, cancellation)
-- [ ] T086 [P] [US2] Implement local summarizer in src/core/handoff/summarizer.ts (Summarize conversation, exclude code and sensitive data by default, support field inclusion configuration: includeCode, includeSensitiveData, includeToolOutput, includeDiffs, includeCommandOutput, includePaths)
-- [ ] T087 [P] [US2] Implement transcript retrieval oracle in src/core/handoff/transcript-oracle.ts (Call adapter.getTranscript() if capabilities.transcriptObservable is true, handle unsupported capability gracefully with user error message)
-- [ ] T088 [P] [US2] Implement handoff serialization in src/core/handoff/handoff-serializer.ts (Create handoff metadata packet with handoffId, sourceSessionId, destinationProfileId, mode, timestamp; DO NOT store transcript or summary content, only fields included in metadata)
-- [ ] T089 [US2] Implement handoff dialog UI in src/vscode/ui/handoff/handoff-dialog.ts (Display three handoff options: full transcript, reviewed summary, no context; highlight recommended mode based on trust-zone combination; for summary mode, show field inclusion configuration checkboxes with defaults: includeCode=false, includeSensitiveData=false, includeToolOutput=false, includeDiffs=false, includeCommandOutput=false, includePaths=true)
-- [ ] T090 [P] [US2] Implement summary editor UI in src/vscode/ui/handoff/summary-editor.ts (UI to review and customize summary fields before handoff, show preview of what will be included)
-- [ ] T091 [US2] Implement handoff-commands.ts in src/vscode/commands/handoff-commands.ts (Commands: switchProfile, exportHandoffPackage, deleteHandoffMetadata; handle full transcript handoff via adapter, summary generation via local summarizer, no-context mode activates new profile without context transfer)
-- [ ] T092 [US2] Add audit logging for handoff operations in src/core/audit/audit-writer.ts (Log events: handoff-initiated, handoff-completed, handoff-failed, handoff-exported; include metadata: handoffId, sourceProfileId, destinationProfileId, mode, userApproval; DO NOT log transcript or summary content)
-- [ ] T093 [US2] Update extension.ts to register handoff commands in src/vscode/extension.ts (Register claudeSwitcher.switchProfile, claudeSwitcher.exportHandoffPackage, claudeSwitcher.deleteHandoffMetadata)
+- [ ] T051 [P] [US2] Implement routing engine in src/core/routing/routing-engine.ts (Manage active endpoint selection, detect active Claude Code sessions, determine appropriate action: reload/keep/new-session, generate state machine for reload flow - FR-010, FR-015)
+- [ ] T052 [P] [US2] Implement Claude Code integrator in src/vscode/integration/claude-code-integrator.ts (Detect if Claude Code panel is open, identify active sessions, modify Claude Code configuration files, trigger panel reload/reopen, verify reload success - FR-011, FR-016)
+- [ ] T053 [P] [US2] Implement configuration file templates in src/vscode/integration/claude-code-integrator.ts (Generate Claude Code configuration with endpoint URL and auth token, support different Claude Code config formats/settings.json, user settings, environment configuration)
+- [ ] T054 [P] [US2] Implement panel reload orchestration in src/vscode/integration/claude-code-integrator.ts (Sequence: check panel state → prompt user → update configuration → close panel → wait → open panel → verify new endpoint, handle reload failures with graceful degradation, retry logic)
+- [ ] T055 [P] [US2] Implement session prompt UI in src/vscode/ui/endpoints/session-prompt.ts (Show dialog with options when active session detected: "(1) Continue session with reload: Close and reopen panel with new endpoint, preserve conversation state", "(2) Keep current session unchanged: Switch endpoint applies to next session", "(3) Start new session: Close current session and start fresh with new endpoint")
+- [ ] T056 [P] [US2] Implement endpoint picker UI in src/vscode/ui/endpoints/endpoint-picker.ts (QuickPick dialog showing available endpoints with URL, connectivity status, label, models with aliases, highlight currently active endpoint)
+- [ ] T057 [US2] Implement routing-commands.ts in src/vscode/commands/routing-commands.ts (Commands: selectActiveEndpoint, reloadPanel with mode: continue/new-session, handle user prompts, orchestrate reload flow via Claude Code integrator)
+- [ ] T058 [US2] Implement status bar indicator in src/vscode/integration/status-bar.ts (Display active endpoint with label, connectivity status badge: green=connected, yellow=untested, red=unreachable, click to open endpoint picker - FR-014)
+- [ ] T059 [US2] Add error handling for reload failures in src/vscode/integration/claude-code-integrator.ts (Handle panel that cannot be programmatically restarted: show user instructions to manually close/reopen panel, detect if user manually reopens panel, verify new endpoint after restart - edge cases)
+- [ ] T060 [US2] Add configuration conflict detection in src/vscode/integration/claude-code-integrator.ts (Detect if Claude Code config was manually edited by user, offer overwrite/merge/abort options, handle concurrent configuration changes)
+- [ ] T061 [US2] Update extension.ts to register routing commands and status bar in src/vscode/extension.ts (Register claudeSwitcher.selectActiveEndpoint, claudeSwitcher.reloadPanel, claudeSwitcher.showEndpointPicker, status bar item)
 
-**Checkpoint**: At this point, User Stories 1 AND 2 should both work independently. Profile switching with handoff (full transcript, summary, or no-context) is functional.
+**Checkpoint**: At this point, User Stories 1 AND 2 should both work. Endpoint switching with panel reload is fully functional, complete with session management, prompt UI, and graceful error handling.
 
 ---
 
-## Phase 5: User Story 3 - Control privacy and routing policy (Priority: P1)
+## Phase 5: User Story 3 - View endpoint status and connectivity (Priority: P2)
 
-**Goal**: Teams can enforce privacy boundaries for coding-agent sessions, particularly restricting direct disclosure of workspace data to cloud model providers while supporting necessary supporting network operations (web research, source control, package/docs access). Privacy modes: unrestricted (automatic approval), guarded (explicit approval required), strict (blocked until policy change).
+**Goal**: Developers can see the currently active endpoint and view connectivity status of all configured endpoints through status bar and endpoint picker.
 
-**Independent Test**: A workspace administrator sets privacy mode (unrestricted, guarded, or strict) via policy editor, attempts a cloud model request through a profile, and observes the appropriate behavior (automatic approval for unrestricted, explicit approval prompt for guarded, blocked with error for strict mode). Supporting network operations (web research, source control, package/docs access) remain allowed unless separate policy restricts them.
+**Independent Test**: A developer views the status bar showing the active endpoint with connectivity badge. Clicking opens the endpoint picker showing all endpoints with URL, connectivity status, and models. User triggers manual connectivity check and sees updated status with latency information if reachable.
 
-### Unit Tests for User Story 3 (Mandatory - Write First, Ensure They Fail)
+### Unit Tests for User Story 3 (Mandatory TDD - Write First, Ensure They Fail)
 
-- [ ] T094 [P] [US3] Request classification (model-provider vs. supporting network) in tests/unit/core/policy/policy-engine.test.ts
-- [ ] T095 [P] [US3] Privacy mode enforcement (unrestricted, guarded, strict) in tests/unit/core/policy/policy-engine.test.ts
-- [ ] T096 [P] [US3] Approval flow logic (guard-distributor) in tests/unit/core/policy/guard-distributor.test.ts
-- [ ] T097 [P] [US3] Auto-revert timeout logic in tests/unit/core/policy/guard-distributor.test.ts
-- [ ] T098 [P] [US3] Policy change validation (requireConfirmation, requireReason, requireSecondApprover) in tests/unit/core/policy/policy-parser.test.ts
+- [ ] T062 [P] [US3] Status bar update logic in tests/unit/core/routing/routing-engine.test.ts
+- [ ] T063 [P] [US3] Endpoint picker data preparation in tests/unit/core/endpoints/endpoint-registry.test.ts
+- [ ] T064 [P] [US3] Manual connectivity check trigger in tests/unit/core/status/status-tracker.test.ts
 
-### Integration Tests for User Story 3 (Mandatory - Write First, Ensure They Fail)
+### Integration Tests for User Story 3 (Mandatory TDD - Write First, Ensure They Fail)
 
-- [ ] T099 [P] [US3] Policy editor UI in tests/integration/ui/policy-editor.test.ts
-- [ ] T100 [P] [US3] Cloud request approval flow in tests/integration/vscode/extension.test.ts
-- [ ] T101 [P] [US3] Policy change confirmation dialogs in tests/integration/ui/policy-editor.test.ts
+- [ ] T065 [P] [US3] Status bar display and updates in tests/integration/vscode/status-bar.test.ts
+- [ ] T066 [P] [US3] Endpoint picker UI display in tests/integration/ui/endpoint-picker.test.ts
+- [ ] T067 [P] [US3] List endpoints command in tests/integration/vscode/extension.test.ts
+- [ ] T068 [P] [US3] Manual connectivity check command in tests/integration/vscode/extension.test.ts
 
 ### Implementation for User Story 3
 
-- [ ] T102 [P] [US3] Implement policy engine request classifier in src/core/policy/policy-engine.ts (Classify requests: model-provider (direct cloud API call) vs. supporting network (web research, source control, package/docs access) - FR-040)
-- [ ] T103 [P] [US3] Implement privacy mode enforcement in src/core/policy/policy-engine.ts (Unrestricted mode: allow requests automatically; Guarded mode: require explicit approval via approveCloudRequest command; Strict mode: block requests before transmitting data - FR-041, FR-042)
-- [ ] T104 [P] [US3] Implement guard distributor for approval flow in src/core/policy/guard-distributor.ts (Track pending cloud requests, store approval with metadata, support auto-revert timeout, support requireSecondApprover when configured)
-- [ ] T105 [P] [US3] Implement policy parser for workspace policy YAML in src/core/policy/policy-parser.ts (Parse .claude-switcher/policy.yaml, validate privacy.handoff.defaultMode ∈ privacy.handoff.allowedModes, validate profiles.allowedTemplateIds reference existing templates)
-- [ ] T106 [P] [US3] Implement policy editor UI in src/vscode/ui/privacy/policy-editor.ts (Edit privacy mode, configure handoff defaults (allowedModes, defaultMode, summaryDefault fields), configure concurrency rules (default, conflictAction, supportsWorktrees, checkpointBeforeMutation), configure profile governance (allowedTemplateIds))
-- [ ] T107 [US3] Implement policy-commands.ts in src/vscode/commands/policy-commands.ts (Commands: setPrivacyMode, approveCloudRequest, denyCloudRequest, showPolicyEditor; handle privacy mode changes with requireConfirmation, requireReason, revertAfterMinutes, requireSecondApprover)
-- [ ] T108 [US3] Add audit logging for policy operations in src/core/audit/audit-writer.ts (Log events: policy-changed, cloud-request-approved, cloud-request-denied; include previousMode, newMode, reason, requestId, destination; DO NOT log request content)
-- [ ] T109 [US3] Update extension.ts to register policy commands in src/vscode/extension.ts (Register claudeSwitcher.setPrivacyMode, claudeSwitcher.approveCloudRequest, claudeSwitcher.denyCloudRequest, claudeSwitcher.showPolicyEditor)
+- [ ] T069 [P] [US3] Implement status bar updates in src/vscode/integration/status-bar.ts (Update on active endpoint change, update on connectivity status change, update on endpoint configuration addition/removal - FR-014, FR-020)
+- [ ] T070 [P] [US3] Implement endpoint picker data preparation in src/vscode/ui/endpoints/endpoint-picker.ts (Prepare endpoint list with id, url, label, hasAuth, status, models [name, alias], isActive flag - FR-022, FR-023)
+- [ ] T071 [P] [US4] Implement list endpoints command in src/vscode/commands/endpoint-commands.ts (Command: listEndpoints - return all endpoints with status, no network calls, use cached status - FR-021, FR-023)
+- [ ] T072 [US3] Implement check connectivity command in src/vscode/commands/endpoint-commands.ts (Command: checkConnectivity - perform manual connectivity check, return status including latency if successful, update status tracker - FR-024)
+- [ ] T073 [US3] Update extension.ts to register status and endpoint list commands in src/vscode/extension.ts (Register claudeSwitcher.listEndpoints, claudeSwitcher.checkConnectivity, claudeSwitcher.showEndpointPicker)
 
-**Checkpoint**: At this point, User Stories 1, 2, AND 3 should all work. Privacy policy enforcement (unrestricted, guarded, strict modes) is functional for cloud model requests while allowing supporting network operations.
+**Checkpoint**: At this point, all three user stories work. Developers can configure endpoints, switch active endpoints with panel reload, and view comprehensive status information.
 
 ---
 
-## Phase 6: User Story 4 - Manage concurrent agents (Priority: P2)
+## Phase 6: Configuration Export/Import (Priority: P2)
 
-**Goal**: Advanced users running multiple AI coding agents simultaneously see visibility into concurrent activity (activity ledger displaying profile, state, known files/commands, recent changes), receive warnings about potential conflicts, and can enable optional safeguards (exclusive writer, worktree isolation, checkpoints) to prevent overlapping modifications.
+**Goal**: Developers can export endpoint configuration (auth tokens excluded) and import configuration for team sharing or backup.
 
-**Independent Test**: A developer starts multiple sessions (simulated), sees an activity ledger displaying profile (with provider class badge), state (initializing, active, idle, switching, terminated), known files, commands, and recent changes for each session. When two sessions indicate overlapping edits on the same file, a conflict warning appears with yellow or red indicator indicating conflict risk (medium or high). Right-clicking on conflict row provides options: "View Conflicting Files", "Open Diff", "Take Over File". Options to enable safeguards: exclusive-writer mode (blocks other sessions), worktree isolation (creates git worktree), checkpoint-before-mutation (creates checkpoint before edit).
+**Independent Test**: A developer exports endpoint configuration to JSON (auth tokens excluded). Another developer imports the configuration; endpoints are loaded but auth tokens are marked as needing configuration. User fills in missing tokens and endpoints become active.
 
-### Unit Tests for User Story 4 (Mandatory - Write First, Ensure They Fail)
+### Unit Tests for User Story 4 (Mandatory TDD - Write First, Ensure They Fail)
 
-- [ ] T110 [P] [US4] Activity tracker session registration in tests/unit/core/state/activity-tracker.test.ts
-- [ ] T111 [P] [US4] Conflict detection based on overlapping file paths in tests/unit/core/state/activity-tracker.test.ts
-- [ ] T112 [P] [US4] Conflict risk level calculation (low/medium/high) in tests/unit/core/state/activity-tracker.test.ts
+- [ ] T074 [P] [US4] Export configuration with auth token exclusion in tests/unit/core/endpoints/endpoint-registry.test.ts
+- [ ] T075 [P] [US4] Import configuration with ID remapping in tests/unit/core/endpoints/endpoint-registry.test.ts
+- [ ] T076 [P] [US4] Conflict detection during import in tests/unit/core/endpoints/endpoint-registry.test.ts
 
-### Integration Tests for User Story 4 (Mandatory - Write First, Ensure They Fail)
+### Integration Tests for User Story 4 (Mandatory TDD - Write First, Ensure They Fail)
 
-- [ ] T113 [P] [US4] Activity ledger view in tests/integration/ui/activity-ledger.test.ts
-- [ ] T114 [P] [US4] Conflict warning notification UI in tests/integration/ui/conflict-warning.test.ts
-- [ ] T115 [P] [US4] Session tracking integration tests in tests/integration/vscode/extension.test.ts
+- [ ] T077 [P] [US4] Export config command in tests/integration/vscode/extension.test.ts
+- [ ] T078 [P] [US4] Import config command in tests/integration/vscode/extension.test.ts
+- [ ] T079 [P] [US4] Auth token configuration dialog after import in tests/integration/ui/endpoint-editor.test.ts
 
 ### Implementation for User Story 4
 
-- [ ] T116 [P] [US4] Implement activity tracker session management in src/core/state/activity-tracker.ts (Register session with sessionId, profileId, state, startTime; track activeFiles and activeCommands; track recentChanges; update conflict risk level: low (no overlaps), medium (some overlap), high (significant overlap); per-user only, no cross-user visibility)
-- [ ] T117 [P] [US4] Implement conflict detection logic in src/core/state/activity-tracker.ts (Detect overlapping file paths across sessions, calculate conflict risk level, trigger warnings)
-- [ ] T118 [US4] Implement activity ledger view in src/vscode/ui/activity/ledger-view.ts (Display table columns: Profile (badge: local/private-network/cloud), State, Files, Commands, Conflict (icon: low/medium/high), Last Active; right-click context menu: "View Conflicting Files", "Open Diff", "Take Over File")
-- [ ] T119 [US4] Implement conflict warning notification UI in src/vscode/ui/activity/conflict-warning.ts (Display notification when conflict becomes medium or high risk, show conflicting session information, provide action buttons: "View Details", "Take Over File", "Dismiss")
-- [ ] T120 [US4] Implement optional safeguards in src/vscode/commands/profile-commands.ts (Policy-driven: exclusive-writer mode blocks other session mutations, worktree isolation uses git worktree (FR-063), checkpoint-before-mutation creates configured checkpoint before modification)
-- [ ] T121 [US4] Add audit logging for session tracking in src/core/audit/audit-writer.ts (Log events: session-started, session-terminated, conflict-detected; include sessionId, profileId, conflictRisk; DO NOT log file contents or command output)
-- [ ] T122 [US4] Update extension.ts to register activity ledger commands in src/vscode/extension.ts (Register claudeSwitcher.showActivityLedger)
+- [ ] T080 [P] [US4] Implement export configuration in src/core/endpoints/endpoint-registry.ts (Export endpoints with URLs, labels, models, EXCLUDE auth tokens, validate user understands auth tokens will not be included, write to clipboard or specified path - FR-045)
+- [ ] T081 [P] [US4] Implement import configuration in src/core/endpoints/endpoint-registry.ts (Load from clipboard or path, validate URLs, generate new IDs for imported endpoints, mark endpoints requiring auth, detect conflicts with existing endpoints)
+- [ ] T082 [P] [US4] Implement conflict resolution in src/core/endpoints/endpoint-registry.ts (Detect URL/label conflicts, offer overwrite/skip/rename options, handle merge scenarios)
+- [ ] T083 [US4] Implement import-commands.ts in src/vscode/commands/import-commands.ts (Commands: exportConfig, importConfig with confirmOverwrite flag, show auth token configuration dialog after import for endpoints needing tokens)
+- [ ] T084 [US4] Update extension.ts to register import/export commands in src/vscode/extension.ts (Register claudeSwitcher.exportConfig, claudeSwitcher.importConfig)
 
-**Checkpoint**: At this point, User Stories 1, 2, 3, AND 4 should all work. Concurrent agent activity visibility, conflict warnings, and optional safeguards are functional.
+**Checkpoint**: At this point, configuration export/import is functional. All core features (US1, US2, US3) plus configuration sharing (US4) work.
 
 ---
 
-## Phase 7: User Story 5 - Validate profiles and diagnostics (Priority: P2)
+## Phase 7: Polish and Debugging (Priority: P3)
 
-**Goal**: Developers can validate profile configurations without incurring charges, identify conflicts, and get actionable error messages when configuration is incorrect or incomplete. Default validation avoids billable API calls; deep validation with explicit authorization identifies potential cost and destination before execution.
+**Goal**: Comprehensive error handling, diagnostics, and user experience polish.
 
-**Independent Test**: A developer creates a new profile or edits an existing profile, runs validation command, receives immediate feedback on: schema compliance, policy compatibility (allowedTemplateIds in workspace policy), secret references (exists in SecretStorage), endpoint reachability (if healthCheck.url configured, perform GET/POST request - no model calls), declared capabilities (matches adapter capabilities). Validation completes in < 3 seconds (FR-014, SC-004). Deep validation with user authorization shows cost estimate before executing model discovery calls or test prompt send/receive.
+### Unit Tests for Polish (Mandatory TDD - Write First, Ensure They Fail)
 
-### Unit Tests for User Story 5 (Mandatory - Write First, Ensure They Fail)
+- [ ] T085 [P] [Polish] Error code standardization in tests/unit/utils/logger.test.ts
+- [ ] T086 [P] [Polish] Retry logic with exponential backoff in tests/unit/utils/retry.test.ts
+- [ ] T087 [P] [Polish] Edge case handling (invalid URLs, missing tokens, unreachable endpoints) in tests/unit/core/endpoints/endpoint-registry.test.ts
 
-- [ ] T123 [P] [US5] Schema validation for Profile, ProfileTemplate, WorkspacePolicy YAML in tests/unit/core/validation/profile-validator.test.ts
-- [ ] T124 [P] [US5] Policy compatibility check (allowedTemplateIds) in tests/unit/core/validation/profile-validator.test.ts
-- [ ] T125 [P] [US5] Secret reference existence check in tests/unit/core/validation/secret-resolution.test.ts
-- [ ] T126 [P] [US5] Endpoint reachability health check in tests/unit/core/validation/profile-validator.test.ts
-- [ ] T127 [P] [US5] Capability declaration validation vs. adapter actual capabilities in tests/unit/core/validation/capability-checker.test.ts
-- [ ] T128 [P] [US5] Deep validation cost estimation in tests/unit/core/validation/profile-validator.test.ts
+### Integration Tests for Polish (Mandatory TDD - Write First, Ensure They Fail)
 
-### Integration Tests for User Story 5 (Mandatory - Write First, Ensure They Fail)
+- [ ] T088 [P] [Polish] Error display with actionable messages in tests/integration/vscode/extension.test.ts
+- [ ] T089 [P] [Polish] Run diagnostics command in tests/integration/vscode/extension.test.ts
+- [ ] T090 [P] [Polish] Telemetry and logging verification in tests/integration/vscode/extension.test.ts
 
-- [ ] T129 [P] [US5] Validate Profile command in tests/integration/vscode/extension.test.ts
-- [ ] T130 [P] [US5] Run Diagnostics command in tests/integration/vscode/extension.test.ts
-- [ ] T131 [P] [US5] Validation error display with redaction in tests/integration/ui/profile-selector.test.ts
+### Implementation for Polish
 
-### Implementation for User Story 5
+- [ ] T091 [P] [Polish] Implement standardized error codes in src/vscode/commands/ (Error codes: ENDPOINT_INVALID_URL, ENDPOINT_NOT_FOUND, ENDPOINT_IN_USE, NO_ENDPOINTS_CONFIGURED, AUTH_TOKEN_MISSING, NETWORK_ERROR, UNREACHABLE, PANEL_RELOAD_FAILED, etc. - include retryable flag)
+- [ ] T092 [P] [Polish] Implement retry logic with exponential backoff in src/utils/retry.ts (Retry connectivity failures with increasing delays, configurable max retries and timeout)
+- [ ] T093 [P] [Polish] Implement error message redaction in src/utils/crypto-utils.ts (Redact auth tokens and secrets in error messages, use [REDACTED] or hash identifiers)
+- [ ] T094 [P] [Polish] Implement run diagnostics command in src/vscode/commands/diagnostics-commands.ts (Check all configured endpoints, report connectivity status, detect configuration conflicts, validate models, summary of issues)
+- [ ] T095 [US5] Implement comprehensive error handling in all commands (Provide clear error messages with actionable suggestions, include error codes for programmatic handling, log errors with context without secrets)
+- [ ] T096 [US5] Add telemetry and audit logging (optional) (Log successful operations, endpoint switches, configuration changes without sensitive data for debugging)
 
-- [ ] T132 [P] [US5] Implement default validation logic (no billable calls) in src/core/validation/profile-validator.ts (FR-071: Schema validation per profile-schema.md, policy compatibility check, secret reference existence validation, endpoint reachability via healthCheck.url GET/POST request, capability declaration validation)
-- [ ] T133 [P] [US5] Implement deep validation logic (with explicit user authorization) in src/core/validation/profile-validator.ts (FR-072: Model discovery via adapter.listModels() if capabilities.modelDiscovery, test message send/receive with minimal prompt; UI shows cost estimate before approval; return SUCCESS, DETAILS with cost estimate, destination)
-- [ ] T134 [P] [US5] Implement conflicting configuration detection in src/core/validation/profile-validator.ts (FR-073: Detect conflicting inherited endpoint/authentication configuration; redact all secret values in error messages; return error: "Conflicting configuration detected for [field path] - [actionable suggestion]")
-- [ ] T135 [P] [US5] Implement run-diagnostics command in src/vscode/commands/validation-commands.ts (Load workspace policy, validate all (or active/default) profiles, collect all errors and warnings together, display results grouped by category: workspace, profiles, policy, secrets)
-- [ ] T136 [US5] Update validate-profile command to support deep validation in src/vscode/commands/validation-commands.ts (Add deepValidation boolean parameter; if true, require approved parameter via user confirmation dialog; show cost estimate and destination before executing deep validation)
-- [ ] T137 [US5] Add redaction for all validation error messages in src/core/audit/redaction-engine.ts (Replace secrets with `[REDACTED]` or hash identifier; show field paths but not values)
-- [ ] T138 [US5] Update extension.ts to register validation commands in src/vscode/extension.ts (Register claudeSwitcher.validateProfile, claudeSwitcher.runDiagnostics)
-
-**Checkpoint**: At this point, User Stories 1, 2, 3, 4, AND 5 should all work. Profile validation (default and deep) provides actionable diagnostics without unnecessary charges or secrets exposure.
+**Checkpoint**: Complete, production-ready extension with comprehensive error handling, diagnostics, and polished user experience.
 
 ---
 
-## Phase 8: Polish & Cross-Cutting Concerns
+## Phase 8: Documentation and Testing Coverage
 
-**Purpose**: Improvements that affect multiple user stories
+**Goal**: Complete documentation and comprehensive test coverage.
 
-- [ ] T139 [P] Create README.md in repository root (Installation instructions for macOS and Linux, configuration guide, features overview, troubleshooting)
-- [ ] T140 [P] Create CHANGELOG.md in repository root (Follow semantic versioning, document user-visible changes for each release)
-- [ ] T141 [P] Create .claude-switcher/.gitignore in .claude-switcher/.gitignore (Ignore handoffs/ except for tracking, ignore audit.log in local development, ignore sessions/)
-- [ ] T142 [P] Create .claude-switcher/.claudeignore for handoffs/ in .claude-switcher/.claudeignore (Configure handoff metadata retention: max size, expiration, auto-delete)
-- [ ] T143 [P] Performance optimization: Ensure profile selection and activation completes in < 10 seconds (SC-001) in src/core/state/profile-registry.ts
-- [ ] T144 [P] Performance optimization: Ensure profile switching with handoff (summary and no-context modes) completes in < 5 seconds (SC-002) in src/core/handoff/summarizer.ts
-- [ ] T145 [P] Performance optimization: Ensure default profile validation completes in < 3 seconds (SC-004) in src/core/validation/profile-validator.ts
-- [ ] T146 [P] Performance optimization: Ensure concurrent agent conflict warnings display within 2 seconds of detection (SC-006) in src/core/state/activity-tracker.ts
-- [ ] T147 [P] Performance optimization: Ensure extension activation and profile loading do not increase VS Code startup time by more than 100 milliseconds (SC-007) in src/vscode/extension.ts
-- [ ] T148 [P] Air-gapped support: Ensure offline capability for local models (validation passes schema and policy checks; endpoint-reachability checks skipped or marked pending) in src/core/validation/profile-validator.ts
-- [ ] T149 [P] Security hardening: Ensure 100% of unauthorized cloud model requests blocked in strict mode before data transmission (SC-003) in src/core/policy/policy-engine.ts
-- [ ] T150 [P] Security hardening: Verify no secrets appear in workspace files (.vscode/, .claude-switcher/) (SC-009) - Write utility test script to scan for secrets
-- [ ] T151 [P] Code cleanup: Remove TODO markers, consolidate duplicate code, improve error messages clarity
-- [ ] T152 Run quickstart.md validation scenarios (Scenarios 1-8) in specs/001-vscode-plugin-generator/quickstart.md (Document validation results, fix any failing scenarios)
-- [ ] T153 Run unit tests: `npm test` and verify coverage > 80% for pure logic modules (src/core/ and src/utils/)
-- [ ] T154 Run integration tests: Press F5 in VS Code to launch Extension Development Host, test all commands
-- [ ] T155 Smoke test checklist: Verify extension loads without errors, status bar items visible, activity ledger opens, policy editor accessible, no errors in "Claude Switcher Errors" output channel, audit log populating, profile files created in ~/.claude-claude-switcher/profiles/, handoff metadata stored in ~/.claude-claude-switcher/handoffs/
+- [ ] T097 Write README.md with installation and usage instructions
+- [ ] T098 Write CHANGELOG.md documenting all features and API changes
+- [ ] T099 Write CONTRIBUTING.md for development setup and contribution guidelines
+- [ ] T100 [P] Verify 100% unit test coverage for pure logic modules (Vitest coverage report)
+- [ ] T101 [P] Verify integration tests cover all user stories end-to-end (VS Code Test Runner)
+- [ ] T102 [P] Performance testing: verify endpoint switching completes in < 1 second (FR-NFR-001)
+- [ ] T103 [P] Load testing: verify 20+ endpoints can be configured without performance degradation
+- [ ] T104 [P] Security testing: verify auth tokens never logged or exposed in error messages
+
+**Final Deliverable**: Complete VS Code extension with full test coverage, documentation, and all features working as specified.
 
 ---
 
-## Dependencies & Execution Order
+## Summary
 
-### Phase Dependencies
-
-- **Setup (Phase 1)**: No dependencies - can start immediately
-- **Foundational (Phase 2)**: Depends on Setup completion - BLOCKS all user stories
-- **User Stories (Phase 3-7)**: All depend on Foundational phase completion
-  - User stories can proceed in dependency order: US1 → US2 → US3 → US4 → US5
-  - US2 (handoff) depends on US1 (profile selection/activation)
-  - US3 (privacy) can proceed in parallel with US1/US2 (uses shared foundational infrastructure)
-  - US4 (concurrency) can proceed after US2 (handoff creates sessions)
-  - US5 (validation) can proceed in parallel with US1 after foundational phase
-- **Polish (Phase 8)**: Depends on all desired user stories being complete
-
-### User Story Dependencies
-
-- **User Story 1 (P1)**: Can start after Foundational (Phase 2) - No dependencies on other stories
-- **User Story 2 (P1)**: Depends on US1 completion - Requires profile selection/activation to have profiles to switch between
-- **User Story 3 (P1)**: Can start after Foundational (Phase 2) - Independent of US1, but tests benefit from having US1 profiles available
-- **User Story 4 (P2)**: Depends on US2 completion (handoff creates sessions) - Requires active sessions to track in activity ledger
-- **User Story 5 (P2)**: Can start after Foundational (Phase 2) - Independent of other stories but benefits from having profiles created by US1
-
-### Within Each User Story
-
-- Tests (unit + integration) MUST be written and FAIL before implementation
-- Pure logic modules before VS Code integration layer
-- Core logic before UI commands
-- Validation logic before feature implementation
-- Core implementation before integration and polish
-
----
-
-## Parallel Opportunities
-
-### Within Setup (Phase 1)
-
-```bash
-# All setup tasks can run in parallel:
-Task: "Configure TypeScript strict mode in tsconfig.json"
-Task: "Configure ESLint for TypeScript"
-Task: "Configure Vitest for unit tests"
-Task: "Configure VS Code Test Runner"
-```
-
-### Within Foundational Phase (Phase 2)
-
-```bash
-# Launch all pure logic utilities together:
-Task: "Create path-normalizer.ts"
-Task: "Create logger.ts"
-Task: "Create crypto-utils.ts"
-Task: "Create retry.ts"
-
-# Launch all adapter stubs together:
-Task: "Create native-claude.ts stub"
-Task: "Create anthropic-compatible.ts stub"
-Task: "Create openai-compatible.ts stub"
-Task: "Create ollama.ts stub"
-Task: "Create generic-command.ts stub"
-
-# Launch all unit tests for foundational logic together (50+ tests can run in parallel)
-```
-
-### Within User Story 1 (US1)
-
-```bash
-# Launch all unit tests for US1 together:
-Task: "Profile loading from user directory"
-Task: "Profile template overlay merging"
-Task: "Secret reference validation check"
-Task: "Profile activation state transition validation"
-Task: "Schema validation for profile YAML"
-
-# After tests pass, launch all integration tests for US1 together:
-Task: "Profile selection command registration"
-Task: "Profile activation via command palette"
-Task: "Profile activation via status bar selector"
-Task: "Secret reference validation with VS Code SecretStorage"
-Task: "Profile template overlay"
-```
-
-### Within User Story 2 (US2)
-
-```bash
-# Launch all unit tests for US2 together:
-Task: "Handoff mode selection logic"
-Task: "Summary generation with field inclusion/exclusion"
-Task: "Transcript retrieval via adapter"
-Task: "Handoff metadata creation"
-
-# After tests pass, launch implementation tasks in parallel:
-Task: "Implement handoff state machine transitions"
-Task: "Implement local summarizer"
-Task: "Implement transcript retrieval oracle"
-Task: "Implement handoff serialization"
-```
-
-### Within Polish Phase (Phase 8)
-
-```bash
-# Launch all documentation tasks together:
-Task: "Create README.md"
-Task: "Create CHANGELOG.md"
-
-# Launch all performance optimization tasks together:
-Task: "Optimize profile selection < 10s"
-Task: "Optimize profile switching < 5s"
-Task: "Optimize validation < 3s"
-Task: "Optimize conflict warnings < 2s"
-
-# Launch all security hardening tasks together:
-Task: "Verify strict mode blocks 100%"
-Task: "Verify no secrets in workspace files"
-```
-
----
-
-## Implementation Strategy
-
-### MVP First (User Story 1 Only + Foundational)
-
-1. Complete Phase 1: Setup (T001-T008)
-2. Complete Phase 2: Foundational (T009-T055) - CRITICAL BLOCKER
-3. Complete Phase 3: User Story 1 (T056-T076)
-4. **STOP and VALIDATE**: Test User Story 1 independently per quickstart.md Scenario 1 and 2
-5. Deploy/demo if ready - MVP complete!
-
-### Incremental Delivery (Recommended)
-
-1. Complete Setup + Foundational → Foundation ready (Day 1-3)
-2. Add User Story 1 → Test independently → Deploy/Demo (MVP! - Day 4-6)
-3. Add User Story 3 → Test independently → Deploy/Demo (Day 7-9) - Privacy ready
-4. Add User Story 2 → Test independently → Deploy/Demo (Day 10-12) - Handoff ready
-5. Add User Story 5 → Test independently → Deploy/Demo (Day 13-14) - Validation ready
-6. Add User Story 4 → Test independently → Deploy/Demo (Day 15-16) - Concurrency ready
-7. Polish Phase 8 → Final release (Day 17-18)
-
-### Parallel Team Strategy
-
-With 2-3 developers:
-
-1. Team completes Setup (Phase 1) together (1 day)
-2. Team completes Foundational (Phase 2) together (2-3 days) - CRITICAL BLOCKER
-3. Once Foundational done:
-   - Developer A: User Story 1 (profile selection/activation) + Foundational tests
-   - Developer B: User Story 3 (privacy policy) + Foundational tests
-   - Developer C: User Story 5 (validation) + Foundational unit tests
-4. After US1 ready:
-   - Developer A: User Story 2 (handoff)
-   - Developer B: User Story 4 (concurrency, depends on US2)
-   - Developer C: Polish documentation, performance, security
-5. Stories complete and integrate independently, merge in priority order
-
----
-
-## Notes
-
-- [P] tasks = different files, no dependencies on incomplete tasks
-- [Story] label maps task to specific user story for traceability
-- Each user story should be independently completable and testable
-- Verify tests FAIL before implementing (constitution requirement)
-- Commit after each task or logical group
-- Stop at any checkpoint to validate story independently
-- Tests are MANDATORY per spec and constitution (dual testing strategy: Vitest for pure logic, VS Code integration for extension behavior)
-- All pure logic modules (src/core/ and src/utils/) MUST have unit tests (>80% coverage required)
-- All VS Code integration MUST have integration tests
-- Every bug fix requires regression test (constitution requirement)
-- Constitution requires: < 100ms additional VS Code startup time, TypeScript strict mode, platform-agnostic paths, SecretStorage for all secrets, no telemetry by default, specific activation events (no `*`), minimal runtime dependencies
-
----
-
-## Validation Checklist
-
-Before marking tasks.md complete:
-
-- [ ] ALL tasks follow checklist format: `- [ ] [TaskID] [P?] [Story?] Description with file path`
-- [ ] ALL user story tasks have [Story] label (US1, US2, etc.)
-- [ ] Setup and Foundational phase tasks do NOT have [Story] labels
-- [ ] Each user story has unit tests (marked [P] for parallel execution)
-- [ ] Each user story has integration tests (marked [P] for parallel execution)
-- [ ] Tests are listed BEFORE implementation (TDD order)
-- [ ] Each task includes exact file path
-- [ ] Tasks are numbered sequentially from T001
-- [ ] All 5 user stories have phases with goals, independent tests, implementation tasks
-- [ ] MVP scope clearly identified (US1 + Foundational)
-- [ ] Dependencies section accurately reflects task interdependencies
-- [ ] Parallel opportunities identified across phases
-- [ ] Implementation strategy provides MVP, incremental, and parallel team approaches
+- **Total Tasks**: 104
+- **User Stories**: 4 (US1-P1, US2-P1, US3-P2, US4-P2)
+- **MVP Features**: US1 + US2 (configure endpoints, switch with reload)
+- **Critical Path**: Phase 1 (Setup) → Phase 2 (Foundational) → Phase 4 (US2 reload implementation)
+- **Parallelizable Tasks**: Marked with [P] can run concurrently once foundational phase completes
