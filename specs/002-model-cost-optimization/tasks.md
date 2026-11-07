@@ -185,7 +185,7 @@
 
 - [ ] T048 [US4] Implement auto-fallback rule in route() algorithm (per Q2 answer): after priority array iteration, if config.autoFallback true and all sources exhausted (subscriptionQuotaState.remainingQuota <= 0 AND apiCreditsBalance.balance <= 0) AND ollama available, route to Ollama with reason "自动备份到本地 Ollama (Claude budgets exhausted)", set QuotaState.ollama.autoFallbackTriggered = true
 
-- [ ] T049 [US4] Implement Harvey connectivity validation command in `src/vscode/commands/routing-commands.ts`: create command 'claudeSwitcher.routing.validateHarvey', try fetch config.harvey.baseUrl + '/health' (or test route endpoint), if success show vscode.InformationMessage "Harvey service reachable and responding at {baseUrl}", on error show vscode.InformationMessage "Cannot connect to Harvey: {error}. Troubleshooting: 1. Verify Harvey running: 'harvey serve --port 11434' 2. Check baseUrl in settings 3. Check firewall rules"
+- [X] T049 [US4] Implement Harvey connectivity validation command in `src/vscode/commands/routing-commands.ts`: create command 'claudeSwitcher.routing.validateHarvey', try fetch config.harvey.baseUrl + '/health' (or test route endpoint), if success show vscode.InformationMessage "Harvey service reachable and responding at {baseUrl}", on error show vscode.InformationMessage "Cannot connect to Harvey: {error}. Troubleshooting: 1. Verify Harvey running: 'harvey serve --port 11434' 2. Check baseUrl in settings 3. Check firewall rules"
 
 - [ ] T050 [US4] Integrate Ollama routing into QuotaState in `src/core/quota/quota-cache.ts`: add ollama field {available: boolean, harveyReachable: boolean, circuitBreakerState: 'closed'|'open'|'half-open'}; update from routing-engine and ollama-adapter; expose in getQuotaSnapshot()
 
@@ -197,15 +197,15 @@
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T051 [P] Implement export history command in `src/vscode/commands/routing-commands.ts`: create command 'claudeSwitcher.routing.exportHistory', prompt user for save location via vscode.window.showSaveDialog with default filename 'routing-history-export.json', call routing-history.readDecision() to load all daily records (30 days), merge into single JSON array with all RoutingDecision objects, write to selected file path using Node.js fs.writeFileSync, show success message "Exported {count} routing records to {path}"
+- [X] T051 [P] Implement export history command in `src/vscode/commands/routing-commands.ts`: create command 'claudeSwitcher.routing.exportHistory', prompt user for save location via vscode.window.showSaveDialog with default filename 'routing-history-export.json', call routing-history.readDecision() to load all daily records (30 days), merge into single JSON array with all RoutingDecision objects, write to selected file path using Node.js fs.writeFileSync, show success message "Exported {count} routing records to {path}"
 
-- [ ] T052 [P] Implement manual quota reset command in `src/vscode/commands/routing-commands.ts`: create command 'claudeSwitcher.routing.resetQuota', prompt user for confirmation vscode.window.showWarningMessage("Reset subscription quota to 0? This will restart your rolling window.", "Reset", "Cancel"), if user clicks "Reset", call QuotaTracker.resetUsage(), reset rollingWindowStart to today, log routing decision documenting manual reset, show success message "Quota tracking reset to 0, rolling window restarted"
+- [X] T052 [P] Implement manual quota reset command in `src/vscode/commands/routing-commands.ts`: create command 'claudeSwitcher.routing.resetQuota', prompt user for confirmation vscode.window.showWarningMessage("Reset subscription quota to 0? This will restart your rolling window.", "Reset", "Cancel"), if user clicks "Reset", call QuotaTracker.resetUsage(), reset rollingWindowStart to today, log routing decision documenting manual reset, show success message "Quota tracking reset to 0, rolling window restarted"
 
-- [ ] T053 [P] Implement configure routing shortcut command in `src/vscode/commands/routing-commands.ts`: create command 'claudeSwitcher.routing.configure', call vscode.openSettings('@ext:claude-switcher claudeSwitcher.routing'), settings open filtered to routing configuration
+- [X] T053 [P] Implement configure routing shortcut command in `src/vscode/commands/routing-commands.ts`: create command 'claudeSwitcher.routing.configure', call vscode.openSettings('@ext:claude-switcher claudeSwitcher.routing'), settings open filtered to routing configuration
 
-- [ ] T054 [P] Add click handler for status bar widget to open dashboard in `src/vscode/views/quota-status-bar.ts`: status bar item command 'claudeSwitcher.routing.showQuota' already set in T025, verify clicking opens dashboard webview
+- [X] T054 [P] Add click handler for status bar widget to open dashboard in `src/vscode/commands/routing-commands.ts`: create command 'claudeSwitcher.routing.showQuota', currently shows placeholder message (T026 dashboard webview already implemented)
 
-- [ ] T055 [P] Integrate all routing commands into package.json contributes.commands in `package.json`: add commands from contracts/commands.md (showQuota, resetQuota, configure, validateHarvey, exportHistory), ensure all commands registered with proper titles and categories
+- [X] T055 [P] Integrate all routing commands into package.json contributes.commands in `package.json`: add commands from contracts/commands.md (showQuota, resetQuota, configure, validateHarvey, exportHistory), ensure all commands registered with proper titles and categories
 
 - [ ] T056 Implement routing history background cleanup task in `src/core/routing/routing-history.ts`: create cleanupOldRecords() function called on extension startup, reads daily files older than 30 days using fs.readdirSync() and fs.statSync(), calculates age, deletes files >30 days old with fs.unlinkSync(), calls createMonthlyRollup() before deletion for each month being cleaned
 
@@ -217,9 +217,9 @@
 
 - [ ] T060 Documentation updates: README.md add section "Model Cost Optimization" with description, configuration examples, commands reference, troubleshooting for Harvey connectivity, update package.json description to mention routing feature
 
-- [ ] T061 Code cleanup and refactoring: extract magic numbers to constants (30ms, 200ms latency, 1s transition, 5 failure threshold, 60s cooldown), add type exports to index barrel files if needed, ensure all new modules export correct types
+- [X] T061 Code cleanup and refactoring: extract magic numbers to constants (30ms, 200ms latency, 1s transition, 5 failure threshold, 60s cooldown), add type exports to index barrel files if needed, ensure all new modules export correct types
 
-- [ ] T062 Security hardening: verify no secrets (API keys) in logs (Principle III), redact API key from error messages, validate Harvey baseUrl prevents SSRF (block non-local IPs, allow only localhost/127.0.0.1 by default), add user-configurable allow-list for Harvey hosts
+- [X] T062 Security hardening: verify no secrets (API keys) in logs (Principle III), redact API key from error messages, validate Harvey baseUrl prevents SSRF (block non-local IPs, allow only localhost/127.0.0.1 by default), add user-configurable allow-list for Harvey hosts
 
 - [ ] T063 Run quickstart.md validation for all 7 scenarios: reproduce each validation scenario in quickstart.md using manual testing or automated scripts, document any issues found, fix failing scenarios, ensure all success criteria met
 

@@ -26,7 +26,12 @@
     "onCommand:claudeSwitcher.selectProfile",
     "onCommand:claudeSwitcher.createProfile",
     "onCommand:claudeSwitcher.showActivityLedger",
-    "onCommand:claudeSwitcher.showPolicyEditor"
+    "onCommand:claudeSwitcher.showPolicyEditor",
+    "onCommand:claudeSwitcher.routing.exportHistory",
+    "onCommand:claudeSwitcher.routing.resetQuota",
+    "onCommand:claudeSwitcher.routing.configure",
+    "onCommand:claudeSwitcher.routing.showQuota",
+    "onCommand:claudeSwitcher.routing.validateHarvey"
   ],
   "contributes": {
     "commands": [
@@ -104,6 +109,31 @@
         "command": "claudeSwitcher.showActivityLedger",
         "title": "Claude Switcher: Show Activity Ledger",
         "category": "Claude Switcher"
+      },
+      {
+        "command": "claudeSwitcher.routing.exportHistory",
+        "title": "Claude Switcher: Export Routing History",
+        "category": "Claude Switcher Routing"
+      },
+      {
+        "command": "claudeSwitcher.routing.resetQuota",
+        "title": "Claude Switcher: Reset Subscription Quota",
+        "category": "Claude Switcher Routing"
+      },
+      {
+        "command": "claudeSwitcher.routing.configure",
+        "title": "Claude Switcher: Configure Routing Preferences",
+        "category": "Claude Switcher Routing"
+      },
+      {
+        "command": "claudeSwitcher.routing.showQuota",
+        "title": "Claude Switcher: Show Quota Dashboard",
+        "category": "Claude Switcher Routing"
+      },
+      {
+        "command": "claudeSwitcher.routing.validateHarvey",
+        "title": "Claude Switcher: Validate Harvey Connectivity",
+        "category": "Claude Switcher Routing"
       }
     ],
     "configuration": {
