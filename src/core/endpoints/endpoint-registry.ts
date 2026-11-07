@@ -9,6 +9,7 @@
 import { URLValidator } from '../../utils/url-validator.js';
 
 export type EndpointStatus = 'untested' | 'connected' | 'unreachable';
+export type EndpointType = 'subscription' | 'api-credits' | 'ollama';
 
 export interface Model {
   name: string;
@@ -22,6 +23,7 @@ export interface Endpoint {
   hasAuth: boolean;
   status: EndpointStatus;
   createdAt: Date;
+  type: EndpointType;
   models: Model[];
 }
 
@@ -29,6 +31,7 @@ export interface CreateEndpointInput {
   url: string;
   label?: string;
   hasAuth: boolean;
+  type: EndpointType;
   models: Model[];
 }
 
@@ -37,6 +40,7 @@ export interface UpdateEndpointInput {
   label?: string;
   hasAuth?: boolean;
   status?: EndpointStatus;
+  type?: EndpointType;
   models?: Model[];
 }
 
@@ -66,6 +70,7 @@ export class EndpointRegistry {
       hasAuth: input.hasAuth,
       status: 'untested',
       createdAt: new Date(),
+      type: input.type,
       models: input.models.map((m) => ({ ...m })),
     };
 
@@ -126,6 +131,10 @@ export class EndpointRegistry {
 
     if (updates.status !== undefined) {
       endpoint.status = updates.status;
+    }
+
+    if (updates.type !== undefined) {
+      endpoint.type = updates.type;
     }
 
     if (updates.models !== undefined) {
@@ -260,6 +269,11 @@ export class EndpointRegistry {
     const validator = new URLValidator();
     if (!validator.isValid(endpoint.url)) {
       throw new EndpointValidationError(`Invalid URL: ${endpoint.url}`);
+    }
+
+    const validTypes: EndpointType[] = ['subscription', 'api-credits', 'ollama'];
+    if (!validTypes.includes(endpoint.type)) {
+      throw new EndpointValidationError(`Invalid endpoint type: ${endpoint.type}`);
     }
 
     if (!endpoint.models || endpoint.models.length === 0) {

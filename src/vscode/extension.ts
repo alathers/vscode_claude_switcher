@@ -10,6 +10,7 @@ import * as vscode from 'vscode';
 import { WorkspaceConfig } from './configuration/workspace-config.js';
 import { SecretStorage } from './configuration/secret-storage.js';
 import { ClaudeCodeIntegrator } from './integration/claude-code-integrator.js';
+import { registerRoutingCommands } from './commands/routing-commands.js';
 
 export function activate(context: vscode.ExtensionContext): void {
   // eslint-disable-next-line no-console
@@ -39,31 +40,10 @@ export function activate(context: vscode.ExtensionContext): void {
   void integrator;
 
   // Register commands
-  // TODO: Command implementations will be added in subsequent tasks
-  // registerEndpointCommands(context, workspaceConfig, secretStorage, integrator);
-  // registerRoutingCommands(context, workspaceConfig, secretStorage, integrator);
+  registerRoutingCommands(context);
 }
 
 export function deactivate(): void {
   // eslint-disable-next-line no-console
   console.info('Claude Switcher extension is now deactivated.');
 }
-
-// Placeholder for future command registration
-// function registerEndpointCommands(
-//   context: vscode.ExtensionContext,
-//   workspaceConfig: WorkspaceConfig,
-//   secretStorage: SecretStorage,
-//   integrator: ClaudeCodeIntegrator
-// ): void {
-//   // Command implementations for US1
-// }
-
-// function registerRoutingCommands(
-//   context: vscode.ExtensionContext,
-//   workspaceConfig: WorkspaceConfig,
-//   secretStorage: SecretStorage,
-//   integrator: ClaudeCodeIntegrator
-// ): void {
-//   // Command implementations for US2
-// }

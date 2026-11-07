@@ -440,6 +440,7 @@ describe('EndpointRegistry', () => {
         hasAuth: false,
         status: 'untested',
         createdAt: new Date(),
+        type: 'subscription',
         models: [{ name: 'model1' }],
       };
 
@@ -489,6 +490,23 @@ describe('EndpointRegistry', () => {
         status: 'untested',
         createdAt: new Date(),
         models: [{ name: '' }],
+      } as Endpoint;
+
+      expect(() => {
+        EndpointRegistry.validate(invalid);
+      }).toThrow(EndpointValidationError);
+    });
+
+    it('should reject endpoint with invalid type', () => {
+      const invalid = {
+        id: 'test-id',
+        url: 'https://api.example.com',
+        label: 'Test',
+        hasAuth: false,
+        status: 'untested',
+        createdAt: new Date(),
+        type: 'invalid-type',
+        models: [{ name: 'model1' }],
       } as Endpoint;
 
       expect(() => {

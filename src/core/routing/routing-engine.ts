@@ -8,10 +8,13 @@
 
 import {
   Endpoint,
+  EndpointType,
   Model,
   CreateEndpointInput as EndpointRegistryCreateInput,
   EndpointRegistry,
 } from '../endpoints/endpoint-registry.js';
+
+export { EndpointType } from '../endpoints/endpoint-registry.js';
 
 export enum SessionState {
   IDLE = 'idle',
@@ -42,6 +45,7 @@ export interface RegistryEndpoint {
   url: string;
   label?: string;
   hasAuth: boolean;
+  type: EndpointType;
   models: Model[];
 }
 
@@ -73,6 +77,7 @@ export class RoutingEngine {
         url: ep.url,
         label: ep.label,
         hasAuth: ep.hasAuth,
+        type: ep.type,
         models: ep.models,
       };
       this.registry.create(input);

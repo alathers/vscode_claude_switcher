@@ -26,7 +26,10 @@
     "onCommand:claudeSwitcher.selectProfile",
     "onCommand:claudeSwitcher.createProfile",
     "onCommand:claudeSwitcher.showActivityLedger",
-    "onCommand:claudeSwitcher.showPolicyEditor"
+    "onCommand:claudeSwitcher.showPolicyEditor",
+    "onCommand:claudeSwitcher.routing.exportHistory",
+    "onCommand:claudeSwitcher.routing.resetQuota",
+    "onCommand:claudeSwitcher.routing.configure"
   ],
   "contributes": {
     "commands": [
@@ -103,6 +106,21 @@
       {
         "command": "claudeSwitcher.showActivityLedger",
         "title": "Claude Switcher: Show Activity Ledger",
+        "category": "Claude Switcher"
+      },
+      {
+        "command": "claudeSwitcher.routing.exportHistory",
+        "title": "Claude Switcher: Export Routing History",
+        "category": "Claude Switcher"
+      },
+      {
+        "command": "claudeSwitcher.routing.resetQuota",
+        "title": "Claude Switcher: Reset Subscription Quota",
+        "category": "Claude Switcher"
+      },
+      {
+        "command": "claudeSwitcher.routing.configure",
+        "title": "Claude Switcher: Configure Routing",
         "category": "Claude Switcher"
       }
     ],
