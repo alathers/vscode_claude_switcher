@@ -174,9 +174,7 @@ export class RoutingHistoryManager {
         }
 
         // Count by task type
-        if (rollup.usageByTaskType[record.taskType] === undefined) {
-          rollup.usageByTaskType[record.taskType] = 0;
-        }
+        rollup.usageByTaskType[record.taskType] ??= 0;
         rollup.usageByTaskType[record.taskType]++;
 
         // Aggregate latency

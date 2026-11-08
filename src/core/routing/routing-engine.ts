@@ -224,7 +224,7 @@ export class RoutingEngine implements IRoutingEngine {
     let priority = this.config.priority || ['subscription', 'api-credits', 'ollama'];
 
     // If Harvey recommends a source and has high confidence, prioritize it first
-    if (harveyRecommendation && harveyRecommendation.routedTo && harveyRecommendation.confidence && harveyRecommendation.confidence >= 0.7) {
+    if (harveyRecommendation?.routedTo && harveyRecommendation.confidence && harveyRecommendation.confidence >= 0.7) {
       const recommendedSource: ModelSource = harveyRecommendation.routedTo;
       // Remove recommended source from its original position and add to front
       priority = [recommendedSource, ...priority.filter(s => s !== recommendedSource)];
@@ -250,7 +250,7 @@ export class RoutingEngine implements IRoutingEngine {
         };
 
         // Attach Harvey recommendation if available
-        if (harveyRecommendation && harveyRecommendation.model && harveyRecommendation.confidence !== undefined) {
+        if (harveyRecommendation?.model && harveyRecommendation.confidence !== undefined) {
           decision.harveyRecommendation = {
             model: harveyRecommendation.model,
             confidence: harveyRecommendation.confidence

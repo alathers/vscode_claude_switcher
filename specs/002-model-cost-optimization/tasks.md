@@ -163,11 +163,11 @@
 
 ### Tests for User Story 4
 
-- [ ] T039 [P] [US4] Unit test for Harvey HTTP client in `tests/unit/core/routing/ollama-adapter.test.ts`: mock fetch() returning Harvey recommendation {routedTo: 'ollama', model: 'llama3.2', confidence: 0.9}, verify getRecommendation(taskType) returns parsed response; test connection refused → throw RoutingError('HARVEY_UNREACHABLE'); test timeout >200ms → throw RoutingError
+- [X] T039 [P] [US4] Unit test for Harvey HTTP client in `tests/unit/core/routing/ollama-adapter.test.ts`: mock fetch() returning Harvey recommendation {routedTo: 'ollama', model: 'llama3.2', confidence: 0.9}, verify getRecommendation(taskType) returns parsed response; test connection refused → throw RoutingError('HARVEY_UNREACHABLE'); test timeout >200ms → throw RoutingError
 
-- [ ] T040 [P] [US4] Unit test for circuit breaker pattern in `tests/unit/core/routing/ollama-adapter.test.ts`: test 5 consecutive failures open circuit breaker, test 60s cooldown transitions to HALF-OPEN, test successful response during HALF-OPEN closes circuit back to CLOSED; verify getCircuitBreakerState() returns correct state
+- [X] T040 [P] [US4] Unit test for circuit breaker pattern in `tests/unit/core/routing/ollama-adapter.test.ts`: test 5 consecutive failures open circuit breaker, test 60s cooldown transitions to HALF-OPEN, test successful response during HALF-OPEN closes circuit back to CLOSED; verify getCircuitBreakerState() returns correct state
 
-- [ ] T041 [P] [US4] Unit test for auto-fallback to Ollama (both Claude exhausted) in `tests/unit/core/routing/routing-engine.test.ts`: set routingConfig.autoFallback = true, mock subscriptionQuotaState.remainingQuota = 0, apiCreditsBalance.balance = 0, call route(request), expect决策 returns 'ollama' with reason "自动备份到本地 Ollama (Claude budgets exhausted)", expect Harvey called to check availability
+- [X] T041 [P] [US4] Unit test for auto-fallback to Ollama (both Claude exhausted) in `tests/unit/core/routing/routing-engine.test.ts`: set routingConfig.autoFallback = true, mock subscriptionQuotaState.remainingQuota = 0, apiCreditsBalance.balance = 0, call route(request), expect决策 returns 'ollama' with reason "自动备份到本地 Ollama (Claude budgets exhausted)", expect Harvey called to check availability
 
 - [ ] T042 [P] [US4] Integration test for Harvey connectivity validation in `tests/integration/core/routing/harvey-connection-integration.test.ts`: run 'claudeSwitcher.routing.validateHarvey' command, Harvey running → webview shows success "Harvey service reachable and responding" with mock response; Harvey stopped → webview shows error "Cannot connect to Harvey: Connection refused (ECONNREFUSED), start Harvey with 'harvey serve --port 11434'"
 

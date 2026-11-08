@@ -8,6 +8,10 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { RoutingEngine, RoutingError, type RoutingRequest, ModelSource, type RoutingDecision } from '../../../../src/core/routing/routing-engine';
 import type { RoutingConfiguration } from '../../../../src/core/routing/routing-config';
 import type { QuotaCache } from '../../../../src/core/quota/quota-cache';
+import { OllamaAdapter, type HarveyRecommendation } from '../../../../src/core/routing/ollama-adapter';
+
+// Mock OllamaAdapter
+vi.mock('../../../../src/core/routing/ollama-adapter');
 
 describe('Routing Engine', () => {
   let mockConfig: RoutingConfiguration;
@@ -21,15 +25,30 @@ describe('Routing Engine', () => {
       priority: ['subscription', 'api-credits', 'ollama'],
       thresholds: {
         subscriptionAlertPercent: 80,
-        apiCreditsAlertPercent: 20
+        subscriptionFallbackPercent: 100
       },
       taskMappings: {},
+      autoFallback: false,
+      harvey: {
+        baseUrl: 'http://localhost:11434'
+      },
       subscription: {
         plan: 'pro',
         dailyLimit: 30,
         rollingWindowDays: 7
       }
     };
+
+    // Mock OllamaAdapter to return successful Harvey recommendation
+    vi.mocked(OllamaAdapter).mockImplementation(() => ({
+      getRecommendation: vi.fn().mockResolvedValue({
+        routedTo: 'subscription',
+        model: 'claude-haiku',
+        confidence: 0.8
+      } as HarveyRecommendation),
+      getCircuitBreakerState: vi.fn().mockReturnValue('closed'),
+      resetCircuitBreaker: vi.fn()
+    } as any));
 
     // Setup mock quota cache
     mockQuotaCache = {
@@ -54,7 +73,8 @@ describe('Routing Engine', () => {
       ollama: {
         available: false,
         harveyReachable: false,
-        circuitBreakerState: 'closed'
+        circuitBreakerState: 'closed',
+        autoFallbackTriggered: false
       }
     };
   });
@@ -221,6 +241,102 @@ describe('Routing Engine', () => {
   });
 
   // ============================================================
+  // T041: User Story 4 Unit Test - Auto-fallback to Ollama
+  // ============================================================
+
+  describe('T041: Auto-fallback to Ollama (both Claude exhausted)', () => {
+    it('should auto-fallback to Ollama when autoFallback enabled and both Claude sources exhausted', async () => {
+      // Setup: subscription exhausted, API credits exhausted, Ollama available, autoFallback enabled
+      // Remove 'ollama' from priority to test auto-fallback path (not priority fallback)
+      mockConfig.priority = ['subscription', 'api-credits'];
+      mockConfig.autoFallback = true;
+
+      mockQuotaCache.subscription.currentUsage = 30;
+      mockQuotaCache.subscription.remainingQuota = 0;
+      mockQuotaCache.subscription.percentUsed = 100;
+
+      mockQuotaCache.apiCredits.balance = 0;
+      mockQuotaCache.apiCredits.authenticated = true;
+
+      mockQuotaCache.ollama.available = true;
+      mockQuotaCache.ollama.harveyReachable = true;
+      mockQuotaCache.ollama.autoFallbackTriggered = false;
+
+      routingEngine = new RoutingEngine(mockConfig, mockQuotaCache);
+
+      const request: RoutingRequest = {
+        taskType: 'any-task',
+        requestId: 'test-autofallback-001'
+      };
+
+      const decision = await routingEngine.route(request);
+
+      // Verify routing decision
+      expect(decision.source).toBe('ollama');
+      expect(decision.reason).toContain('Auto-fallback');
+      expect(decision.reason).toContain('Ollama');
+      expect(decision.reason).toContain('Claude budgets');
+
+      // Verify autoFallbackTriggered flag is set (checking quota cache state)
+      expect(mockQuotaCache.ollama.autoFallbackTriggered).toBe(true);
+    });
+
+    it('should not auto-fallback when autoFallback disabled and both Claude sources exhausted', async () => {
+      // Setup: subscription exhausted, API credits exhausted, Ollama available, but autoFallback disabled
+      mockConfig.autoFallback = false;
+
+      mockQuotaCache.subscription.currentUsage = 30;
+      mockQuotaCache.subscription.remainingQuota = 0;
+      mockQuotaCache.subscription.percentUsed = 100;
+
+      mockQuotaCache.apiCredits.balance = 0;
+
+      mockQuotaCache.ollama.available = true;
+      mockQuotaCache.ollama.harveyReachable = true;
+
+      routingEngine = new RoutingEngine(mockConfig, mockQuotaCache);
+
+      const request: RoutingRequest = {
+        taskType: 'any-task',
+        requestId: 'test-autofallback-002'
+      };
+
+      // Should fall back via priority (since ollama is in priority), but NOT via auto-fallback
+      const decision = await routingEngine.route(request);
+
+      expect(decision.source).toBe('ollama');
+      expect(decision.reason).toContain('Priority fallback');
+      expect(decision.reason).not.toContain('Auto-fallback');
+    });
+
+    it('should not auto-fallback when Ollama unavailable even if both Claude exhausted', async () => {
+      // Setup: subscription exhausted, API credits exhausted, but Ollama not available
+      mockConfig.autoFallback = true;
+
+      mockQuotaCache.subscription.currentUsage = 30;
+      mockQuotaCache.subscription.remainingQuota = 0;
+
+      mockQuotaCache.apiCredits.balance = 0;
+
+      mockQuotaCache.ollama.available = false;
+      mockQuotaCache.ollama.harveyReachable = false;
+
+      routingEngine = new RoutingEngine(mockConfig, mockQuotaCache);
+
+      const request: RoutingRequest = {
+        taskType: 'any-task',
+        requestId: 'test-autofallback-003'
+      };
+
+      // Should throw error - no available sources
+      await expect(routingEngine.route(request)).rejects.toThrow(RoutingError);
+      await expect(routingEngine.route(request)).rejects.toMatchObject({
+        code: 'NO_AVAILABLE_SOURCES'
+      });
+    });
+  });
+
+  // ============================================================
   // Additional Integration Tests
   // ============================================================
 
@@ -250,7 +366,8 @@ describe('Routing Engine', () => {
         ollama: {
           available: false,
           harveyReachable: false,
-          circuitBreakerState: 'closed'
+          circuitBreakerState: 'closed',
+          autoFallbackTriggered: false
         }
       });
     });
