@@ -167,6 +167,21 @@ The Model Cost Optimization feature consists of several core modules:
 
 This project is under active development. Model Cost Optimization is a major feature currently being implemented.
 
+## Documentation
+
+For detailed documentation on Model Cost Optimization, see:
+
+- **[COMPREHENSIVE GUIDE](docs/MODEL_COST_OPTIMIZATION.md)** - Complete documentation with architecture, configuration, testing, and troubleshooting
+- **[ADHD-FRIENDLY GUIDE](docs/MODEL_COST_OPTIMIZATION-ADHD.md)** - Simplified version with quick start and visual flowcharts
+- **[QUICK REFERENCE](docs/QUICK_REFERENCE.md)** - Developer cheat sheet with copy-paste code and commands
+
+### Additional Resources
+
+- **Validation Reports** ([tests/validation/](tests/validation/)) - Test results, constitution compliance, and completion summaries
+- **Specification** ([specs/002-model-cost-optimization/](specs/002-model-cost-optimization/)) - Feature specs, plans, and task breakdown
+
+---
+
 ## License
 
 MIT
