@@ -89,7 +89,8 @@ function getPlaceholderQuota(): QuotaSnapshot {
     ollama: {
       available: false,
       harveyReachable: false,
-      circuitBreakerState: 'closed'
+      circuitBreakerState: 'closed',
+      autoFallbackTriggered: false
     }
   };
 }

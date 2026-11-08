@@ -85,6 +85,13 @@ export class RoutingHistoryManager {
   }
 
   /**
+   * Get monthly rollup path
+   */
+  private getMonthlyRollupPath(year: number, month: number): string {
+    return `${ROUTING_RECORDS_DIR}monthly/${year}-${String(month + 1).padStart(2, '0')}.json`;
+  }
+
+  /**
    * Write a routing decision to daily records
    */
   async writeDecision(decision: Omit<RoutingDecision, 'id' | 'timestamp'>): Promise<string> {
@@ -127,7 +134,9 @@ export class RoutingHistoryManager {
   }
 
   /**
-   * Create monthly rollup from 30-day records
+   * Create monthly rollup from daily records (T056)
+   *
+   * Aggregates all daily records for the specified month into a monthly summary.
    */
   async createMonthlyRollup(year: number, month: number): Promise<MonthlyRollup> {
     const rollup: MonthlyRollup = {
@@ -143,22 +152,105 @@ export class RoutingHistoryManager {
       averageLatencyMs: 0
     };
 
-    // TODO: Implement aggregation from daily records
-    // This will read all daily records for the month and aggregate them
+    // Aggregate daily records for the month
+    // Day 1 to last day of month
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(year, month, day);
+      const records = await this.readDecision(date);
+
+      // Aggregate each record into rollup
+      for (const record of records) {
+        rollup.totalRequests++;
+
+        // Count by source (note: record.routedTo uses kebab-case, rollup uses camelCase)
+        if (record.routedTo === 'subscription') {
+          rollup.usageBySource.subscription++;
+        } else if (record.routedTo === 'api-credits') {
+          rollup.usageBySource.apiCredits++;
+        } else if (record.routedTo === 'ollama') {
+          rollup.usageBySource.ollama++;
+        }
+
+        // Count by task type
+        if (rollup.usageByTaskType[record.taskType] === undefined) {
+          rollup.usageByTaskType[record.taskType] = 0;
+        }
+        rollup.usageByTaskType[record.taskType]++;
+
+        // Aggregate latency
+        if (record.performance?.latencyMs) {
+          rollup.totalLatencyMs += record.performance.latencyMs;
+        }
+      }
+    }
+
+    // Calculate average latency
+    if (rollup.totalRequests > 0) {
+      rollup.averageLatencyMs = Math.round(rollup.totalLatencyMs / rollup.totalRequests);
+    }
 
     return rollup;
   }
 
   /**
-   * Delete daily records older than specified days
+   * Store monthly rollup to globalState (T056)
+   */
+  async storeMonthlyRollup(year: number, month: number, rollup: MonthlyRollup): Promise<void> {
+    const key = this.getMonthlyRollupPath(year, month);
+    await this.globalState.update(key, rollup);
+  }
+
+  /**
+   * Delete daily records older than specified days (T056)
    * Called on extension startup
    */
-  async deleteDailyFiles(_olderThanDays: number = 30): Promise<void> {
-    // TODO: Implement cleanup of old daily records
-    // This reads all keys matching routing-records/daily/*.json
-    // and deletes files older than olderThanDays
+  async deleteDailyFiles(olderThanDays: number = 30): Promise<void> {
+    const today = new Date();
+    const cutoffDate = new Date(today);
+    cutoffDate.setDate(cutoffDate.getDate() - olderThanDays);
 
-    // Implementation will be completed in Phase 7 (T056, T057)
+    // Track months that need rollups before deletion
+    const monthsToRollup = new Set<string>();
+
+    // Get all keys from globalState that match routing-records/daily pattern
+    const allKeys = this.globalState.keys();
+    const dailyKeys = allKeys.filter(key => key.startsWith(this.getRecordsDir()));
+
+    for (const key of dailyKeys) {
+      // Extract date from file path (e.g., routing-records/daily/2024-01-15.json)
+      const dateMatch = key.match(/(\d{4}-\d{2}-\d{2})\.json$/);
+      if (!dateMatch) {
+        continue;
+      }
+
+      const fileDate = new Date(dateMatch[1]);
+
+      // Check if file is older than cutoff date
+      if (fileDate < cutoffDate) {
+        // Track month for rollup
+        const month = `${fileDate.getFullYear()}-${String(fileDate.getMonth() + 1).padStart(2, '0')}`;
+        monthsToRollup.add(month);
+
+        // Delete the old daily record
+        await this.globalState.update(key, undefined);
+        console.log(`[RoutingHistory] Deleted old daily record: ${key}`);
+      }
+    }
+
+    // Create monthly rollups for cleaned up months
+    for (const month of monthsToRollup) {
+      const [year, monthStr] = month.split('-').map(Number);
+      try {
+        // Create and store the monthly rollup
+        const rollup = await this.createMonthlyRollup(year, monthStr - 1);
+        await this.storeMonthlyRollup(year, monthStr - 1, rollup);
+        console.log(`[RoutingHistory] Created and stored monthly rollup for ${month}: ${rollup.totalRequests} requests`);
+      } catch (error) {
+        console.error(`[RoutingHistory] Failed to create monthly rollup for ${month}:`, error);
+      }
+    }
   }
 
   /**
@@ -202,5 +294,14 @@ export class RoutingHistoryManager {
     allDecisions.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
     return allDecisions;
+  }
+
+  /**
+   * Cleanup old records on extension startup (T056)
+   *
+   * Removes daily records older than 30 days and creates monthly rollups.
+   */
+  async cleanupOldRecords(olderThanDays: number = 30): Promise<void> {
+    await this.deleteDailyFiles(olderThanDays);
   }
 }

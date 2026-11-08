@@ -42,6 +42,7 @@ export interface OllamaState {
   available: boolean;
   harveyReachable: boolean;
   circuitBreakerState: 'closed' | 'open' | 'half-open';
+  autoFallbackTriggered: boolean;
 }
 
 /**

@@ -48,7 +48,8 @@ export function createStatusBarItem(): vscode.StatusBarItem {
       ollama: {
         available: false,
         harveyReachable: false,
-        circuitBreakerState: 'closed'
+        circuitBreakerState: 'closed',
+        autoFallbackTriggered: false
       }
     });
   }

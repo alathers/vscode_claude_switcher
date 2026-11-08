@@ -20,7 +20,7 @@ import type { RoutingDecision } from './routing-history';
 import { LogLevel } from '../../utils/logger';
 
 /**
- * Routing decision log entry
+ * Routing decision log entry (T057: enhanced with cost tracking)
  */
 export interface RoutingDecisionLogEntry {
   correlationId: string;
@@ -30,16 +30,20 @@ export interface RoutingDecisionLogEntry {
   reason: string;
   latencyMs?: number;
   timestamp: string;
+  quotaBefore?: number;
+  quotaAfter?: number;
+  estimatedCost?: number;
 }
 
 /**
- * Log routing decision at specified level
+ * Log routing decision at specified level (T057: enhanced with cost tracking)
  */
 export function logRoutingDecision(
   logger: Logger,
   level: LogLevel.INFO | LogLevel.WARN | LogLevel.ERROR,
   decision: RoutingDecision,
-  requestId?: string
+  requestId?: string,
+  estimatedCost?: number
 ): void {
   const entry: RoutingDecisionLogEntry = {
     correlationId: requestId ?? decision.id,
@@ -48,7 +52,10 @@ export function logRoutingDecision(
     taskType: decision.taskType,
     reason: decision.reason,
     latencyMs: decision.performance?.latencyMs,
-    timestamp: decision.timestamp
+    timestamp: decision.timestamp,
+    quotaBefore: decision.quotaBefore,
+    quotaAfter: decision.quotaAfter,
+    estimatedCost
   };
 
   const logFn = level === LogLevel.INFO
@@ -61,10 +68,13 @@ export function logRoutingDecision(
     correlationId: entry.correlationId,
     taskId: entry.taskId,
     routedTo: entry.routedTo,
-    taskType: entry.taskType,
+    taskType: entry.taskId,
     reason: entry.reason,
     latencyMs: entry.latencyMs,
-    timestamp: entry.timestamp
+    timestamp: entry.timestamp,
+    quotaBefore: entry.quotaBefore,
+    quotaAfter: entry.quotaAfter,
+    estimatedCost: entry.estimatedCost
   });
 }
 
