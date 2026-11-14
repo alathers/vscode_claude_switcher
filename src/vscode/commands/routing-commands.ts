@@ -7,6 +7,7 @@
  */
 
 import * as vscode from 'vscode';
+<<<<<<< HEAD
 import * as fs from 'fs';
 import * as path from 'path';
 import { URLValidator } from '../../utils/url-validator.js';
@@ -15,10 +16,24 @@ import { URLValidator } from '../../utils/url-validator.js';
 const HARVEY_DEFAULT_PORT = 11434;
 const HARVEY_DEFAULT_URL = `http://localhost:${HARVEY_DEFAULT_PORT}`;
 const ROUTING_HISTORY_RETENTION_DAYS = 30;
+=======
+import { URLValidator } from '../../utils/url-validator.js';
+import { RoutingHistoryManager } from '../../core/routing/routing-history.js';
+import { resetUsage } from '../../core/quota/quota-tracker.js';
+import type { SubscriptionQuotaState } from '../../core/quota/quota-cache.js';
+
+// Constants (T061: Extract magic numbers)
+const HARVEY_DEFAULT_PORT = 11434;
+const HARVEY_DEFAULT_URL = `http://localhost:${HARVEY_DEFAULT_PORT}`;
+// ROUTING_HISTORY_RETENTION_DAYS is used by routing-history.getAllDecisionsForExport()
+// Exporting here for reference when implementing history analytics
+// const ROUTING_HISTORY_RETENTION_DAYS = 30; // eslint-disable-line @typescript-eslint/no-unused-vars // Used for history export retention
+>>>>>>> origin/main
 
 // Security: URL validator for SSRF prevention (T062)
 const urlValidator = new URLValidator();
 
+<<<<<<< HEAD
 /**
  * Gets the default path for routing history records.
  */
@@ -62,6 +77,26 @@ async function readAllRoutingDecisions(context: vscode.ExtensionContext): Promis
 
 /**
  * Registers routing commands.
+=======
+// Global state for quota tracker (will be initialized by extension)
+let quotaState: SubscriptionQuotaState | null = null;
+let routingHistory: RoutingHistoryManager | null = null;
+
+/**
+ * Initialize routing commands global state.
+ * Called by extension activation.
+ */
+export function initializeRoutingCommands(
+  theQuotaState: SubscriptionQuotaState,
+  theRoutingHistory: RoutingHistoryManager
+): void {
+  quotaState = theQuotaState;
+  routingHistory = theRoutingHistory;
+}
+
+/**
+ * Registers all routing commands.
+>>>>>>> origin/main
  */
 export function registerRoutingCommands(context: vscode.ExtensionContext): void {
   // T051: Export routing history command
@@ -69,6 +104,14 @@ export function registerRoutingCommands(context: vscode.ExtensionContext): void 
     'claudeSwitcher.routing.exportHistory',
     async () => {
       try {
+<<<<<<< HEAD
+=======
+        if (!routingHistory) {
+          await vscode.window.showErrorMessage('Routing history not initialized');
+          return;
+        }
+
+>>>>>>> origin/main
         // Prompt user for save location
         const saveUri = await vscode.window.showSaveDialog({
           defaultUri: vscode.Uri.file('routing-history-export.json'),
@@ -83,9 +126,16 @@ export function registerRoutingCommands(context: vscode.ExtensionContext): void 
         }
 
         // Load all routing decisions
+<<<<<<< HEAD
         const decisions = await readAllRoutingDecisions(context);
 
         // Write to selected file
+=======
+        const decisions = await routingHistory.getAllDecisionsForExport();
+
+        // Write to selected file
+        const fs = require('fs');
+>>>>>>> origin/main
         fs.writeFileSync(saveUri.fsPath, JSON.stringify(decisions, null, 2), 'utf-8');
 
         // Show success message
@@ -103,6 +153,14 @@ export function registerRoutingCommands(context: vscode.ExtensionContext): void 
   const resetQuotaCommand = vscode.commands.registerCommand(
     'claudeSwitcher.routing.resetQuota',
     async () => {
+<<<<<<< HEAD
+=======
+      if (!quotaState) {
+        await vscode.window.showErrorMessage('Quota tracker not initialized');
+        return;
+      }
+
+>>>>>>> origin/main
       const confirm = await vscode.window.showWarningMessage(
         'Reset subscription quota to 0? This will restart your rolling window.',
         { modal: true },
@@ -112,6 +170,7 @@ export function registerRoutingCommands(context: vscode.ExtensionContext): void 
 
       if (confirm === 'Reset') {
         try {
+<<<<<<< HEAD
           // TODO: Integrate with QuotaTracker.resetUsage()
           // For now, just show confirmation since QuotaTracker not yet implemented
           await vscode.window.showInformationMessage(
@@ -120,6 +179,26 @@ export function registerRoutingCommands(context: vscode.ExtensionContext): void 
 
           // Log routing decision documenting manual reset
           // TODO: Call routingHistory.writeDecision() when available
+=======
+          // Reset quota state
+          resetUsage(quotaState);
+
+          // TODO: Update quotaState reference (this needs to be refactored to be mutable)
+          // For now, show confirmation message
+
+          // TODO: Log routing decision documenting manual reset
+          // await routingHistory?.writeDecision({
+          //   routedTo: 'subscription',
+          //   taskType: 'quota-reset',
+          //   quotaBefore: quotaState.currentUsage,
+          //   quotaAfter: 0,
+          //   reason: 'Manual quota reset by user'
+          // });
+
+          await vscode.window.showInformationMessage(
+            'Quota tracking reset to 0, rolling window restarted'
+          );
+>>>>>>> origin/main
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : String(error);
           await vscode.window.showErrorMessage(`Failed to reset quota: ${errorMessage}`);
